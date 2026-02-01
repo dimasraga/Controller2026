@@ -169,7 +169,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // --- Submit Forms ---
   submitNetwork.addEventListener('click', function (event) {
+    event.preventDefault(); // Mencegah reload halaman agar data JS terkirim
     var formData = new FormData(netIntForm);
+    formData.set('loggerMode', loggerMode.checked ? "true" : "false");
+    formData.set('modbusMode', modbusMode.checked ? "true" : "false");
     submitForm(formData);
   });
 
