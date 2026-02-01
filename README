@@ -1,0 +1,116 @@
+# IoT Node Setup - Universal Sensor Logger
+
+**IoT Node Setup** is a robust, industrial-grade data acquisition and logging system based on the ESP32 microcontroller. It is designed to interface with various sensors (Analog, Digital, Modbus RTU/TCP) and transmit data to central servers via MQTT or HTTP, with support for both WiFi and Ethernet (W5500) connectivity.
+
+This project was developed during an internship program at **Medion**.
+
+## 👤 Author
+
+*   **Name:** Dimas Raga
+*   **Instagram:** [@dmsragaa](https://instagram.com/dmsragaa)
+*   **Affiliation:** Internship Program, Electrical Engineering (Teknik Elektro)
+*   **Institution:** Institut Teknologi Sepuluh Nopember (ITS)
+*   **Year:** 2026
+
+---
+
+## 🚀 Key Features
+
+### 🌐 Connectivity
+*   **Dual Network Interface:** Supports **WiFi** (Station + AP Mode) and **Ethernet** (W5500) with automatic failover logic.
+*   **Protocols:**
+    *   **MQTT:** Real-time data publishing and remote control.
+    *   **HTTP/HTTPS:** Data logging to ERP/API endpoints.
+    *   **Modbus TCP & RTU:** Acts as a Modbus Master to read external industrial sensors and as a Slave for integration.
+
+### 📡 Input/Output
+*   **4x Analog Inputs:** High-precision 16-bit ADC (ADS1115) with configurable scaling, filtering, and calibration ($y = mx + c$).
+*   **4x Digital Inputs:** Opto-isolated input support with multiple modes:
+    *   *Normal Status* (High/Low)
+    *   *Cycle Time* (Duration between triggers)
+    *   *Counting* (Pulse counter)
+    *   *Run Time* (Accumulated active time)
+    *   *Pulse Mode* (Frequency/Flow measurement)
+*   **Modbus Master:** Configurable polling for external RS485 sensors.
+
+### 💾 Storage & Reliability
+*   **SD Card Backup:** Automatically buffers data when the network is offline and uploads it upon reconnection.
+*   **SPIFFS:** On-board storage for web interface files and JSON configuration.
+*   **Watchdog Timer:** Hardware watchdog to prevent system hangs.
+*   **FreeRTOS:** Multitasking architecture (Network, Data Acquisition, Modbus, Logger) running on dual cores.
+
+### ⚙️ Configuration
+*   **Web Interface:** User-friendly responsive web dashboard for configuring Network, I/O, Modbus, and System settings.
+*   **OTA Update:** Support for Over-The-Air firmware updates via the web interface.
+
+---
+
+## 🛠️ Hardware Requirements
+
+*   **Microcontroller:** ESP32 DevKit V1
+*   **Ethernet:** W5500 SPI Module
+*   **ADC:** ADS1115 (I2C)
+*   **RTC:** DS3231 (I2C)
+*   **Storage:** Micro SD Card Module (SPI)
+*   **Communication:** RS485 to TTL Module (for Modbus RTU)
+
+### Pin Configuration (Default)
+| Component | ESP32 Pin |
+| :--- | :--- |
+| **Ethernet (W5500)** | CS: 4, MOSI: 23, MISO: 19, SCK: 18, RST: 12 |
+| **SD Card** | CS: 5, MOSI: 23, MISO: 19, SCK: 18 |
+| **ADS1115 (I2C)** | SDA: 21, SCL: 22 |
+| **RTC DS3231** | SDA: 21, SCL: 22 |
+| **RS485 (Serial2)** | RX: 16, TX: 17 |
+| **Digital Inputs** | 32, 33, 25, 26 |
+| **Status LED** | 2 |
+
+---
+
+## 📦 Installation
+
+1.  **Prerequisites:**
+    *   [PlatformIO](https://platformio.org/) (Recommended) or Arduino IDE.
+    *   Drivers for CP210x/CH340.
+
+2.  **Libraries:**
+    The project relies on the following libraries (managed via `platformio.ini`):
+    *   `ArduinoJson`
+    *   `PubSubClient`
+    *   `Modbus-ESP8266` (ModbusIP/RTU)
+    *   `Adafruit ADS1X15`
+    *   `RTClib`
+    *   `Ethernet`
+    *   `ESPAsyncWebServer` & `AsyncTCP`
+
+3.  **Upload Filesystem:**
+    *   Ensure the `data/` folder contains the HTML/JS/CSS files.
+    *   Run **"Upload Filesystem Image"** in PlatformIO to flash the web interface to SPIFFS.
+
+4.  **Flash Firmware:**
+    *   Build and upload the firmware to the ESP32.
+
+---
+
+## 🖥️ Usage
+
+1.  **Initial Setup:**
+    *   Power on the device.
+    *   Connect to the WiFi Access Point (Default SSID: `Medion_IoT`, Password: `password` or as configured).
+    *   Open a browser and go to `192.168.4.1`.
+
+2.  **Dashboard:**
+    *   **Home:** View real-time sensor data and connection status.
+    *   **Network:** Configure WiFi/Ethernet, MQTT broker, and API endpoints.
+    *   **Analog/Digital:** Configure sensor names, scaling, and modes.
+    *   **Modbus:** Setup RS485 parameters and polling registers.
+
+---
+
+## 📝 License
+
+This project is proprietary software developed for internal research and development purposes.
+
+---
+
+*Created with ❤️ by Dimas Raga - 2026*
