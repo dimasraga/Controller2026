@@ -9,7 +9,6 @@ class SystemMonitor
 {
 public:
     SystemMonitor() {}
-
     void printCurrent()
     {
         uint32_t freeHeap = ESP.getFreeHeap();
