@@ -19,7 +19,6 @@ public:
         uint8_t heapPct = (totalHeap > 0) ? ((totalHeap - freeHeap) * 100) / totalHeap : 0;
 
         Serial.println(F("\n--- [ SYS MONITOR ] ---"));
-
         Serial.printf("HEAP : %u / %u bytes (%u%% used)\n", freeHeap, totalHeap, heapPct);
         Serial.printf("MIN  : %u bytes (Lowest)\n", minFreeHeap);
 
