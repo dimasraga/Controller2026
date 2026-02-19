@@ -39,7 +39,6 @@ TaskHandle_t Task_Core1_DataAcquisition = NULL;
 TaskHandle_t Task_Core1_ModbusClient = NULL;
 TaskHandle_t Task_Core1_DataLogger = NULL;
 
-// ============================================================================
 // QUEUE HANDLES untuk komunikasi antar task
 // ============================================================================
 QueueHandle_t queueSensorData = NULL;
