@@ -2526,7 +2526,7 @@ void Task_DataAcquisition(void *parameter)
   }
 
   while (true)
-  
+
   {
     bool useTCP = (networkSettings.protocolMode2.indexOf("TCP") >= 0);
     bool useRTU = (networkSettings.protocolMode2.indexOf("RTU") >= 0);
@@ -4921,13 +4921,12 @@ void handleFormSubmit(AsyncWebServerRequest *request)
     }
     if (request->hasArg("mqttUsername"))
       networkSettings.mqttUsername = request->arg("mqttUsername");
-    if (request->hasArg("mqttPassword"))
+    if (request->hasArg("mqttPass"))
       networkSettings.mqttPassword = request->arg("mqttPass");
     if (request->hasArg("loggerMode"))
     {
       networkSettings.loggerMode = request->arg("loggerMode");
     }
-    // [PENTING] Jika TIDAK ada kiriman -> Artinya user mematikan tombol -> Paksa set Disabled
     else
     {
       networkSettings.loggerMode = "Disabled";
@@ -4937,8 +4936,8 @@ void handleFormSubmit(AsyncWebServerRequest *request)
       networkSettings.protocolMode2 = request->arg("protocolMode2");
       if (request->hasArg("modbusPort"))
         modbusParam.port = request->arg("modbusPort").toInt();
-      if (request->hasArg("slaveID"))
-        modbusParam.slaveID = request->arg("slaveID").toInt();
+      if (request->hasArg("modbusSlaveID"))
+        modbusParam.slaveID = request->arg("modbusSlaveID").toInt();
     }
     configureSendTriggerInterrupt(networkSettings);
     request->send(200, "text/plain", "Form data received");

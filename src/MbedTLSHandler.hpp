@@ -1,10 +1,8 @@
 #ifndef MBEDTLS_HANDLER_HPP
 #define MBEDTLS_HANDLER_HPP
-
 #include <Arduino.h>
 #include <Ethernet.h>
 #include "esp_task_wdt.h"
-
 #include "mbedtls/platform.h"
 #include "mbedtls/net_sockets.h"
 #include "mbedtls/ssl.h"
@@ -12,28 +10,21 @@
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
 #include "mbedtls/base64.h"
-
 #define TLS_HANDSHAKE_TIMEOUT 8000U
 #define TLS_READ_TIMEOUT 4000U
 #define TLS_WRITE_TIMEOUT 8000U
 #define TLS_RECV_WAIT_MS 2U
-
 #define TCP_CONNECT_RETRIES 1
-
 #define SSL_BUFFER_SIZE 1024U
 #define SSL_SEND_CHUNK_SIZE 1024U
 #define TCP_SEND_FLUSH_DELAY_MS 1U
-
-#define BASE64_AUTH_SIZE 192U
-
+#define BASE64_AUTH_SIZE 352U
 static const int PREFERRED_CIPHERS[] = {
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_RSA_WITH_AES_128_GCM_SHA256,
     0};
-
 #define MBEDTLS_DEBUG_ENABLE
-
 #ifdef MBEDTLS_DEBUG_ENABLE
 #define TLS_LOG(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
 #else
@@ -48,17 +39,14 @@ static int eth_ssl_send(void *ctx, const unsigned char *buf, size_t len)
     EthernetClient *client = static_cast<EthernetClient *>(ctx);
     if (!client || !client->connected())
         return MBEDTLS_ERR_NET_CONN_RESET;
-
     if (len > SSL_SEND_CHUNK_SIZE)
         len = SSL_SEND_CHUNK_SIZE;
-
     int written = client->write(buf, len);
     if (written > 0)
     {
         client->flush();
         return written;
     }
-
     return MBEDTLS_ERR_SSL_WANT_WRITE;
 }
 
@@ -67,7 +55,6 @@ static int eth_ssl_recv(void *ctx, unsigned char *buf, size_t len)
     EthernetClient *client = static_cast<EthernetClient *>(ctx);
     if (!client)
         return MBEDTLS_ERR_NET_CONN_RESET;
-
     if (client->available() > 0)
     {
         int avail = client->available();
@@ -75,38 +62,29 @@ static int eth_ssl_recv(void *ctx, unsigned char *buf, size_t len)
         int n = client->read(buf, readLen);
         return (n > 0) ? n : MBEDTLS_ERR_SSL_WANT_READ;
     }
-
     if (!client->connected())
         return MBEDTLS_ERR_NET_CONN_RESET;
-
     vTaskDelay(pdMS_TO_TICKS(TLS_RECV_WAIT_MS));
     return MBEDTLS_ERR_SSL_WANT_READ;
 }
 
 static bool parseJsonResponse(const char *body, size_t bodyLen)
 {
-
     const char *p = body;
     const char *end = body + bodyLen;
-
     while (p < end - 14)
     {
-
         const char *found = strstr(p, "\"isSuccess\"");
         if (!found || found >= end)
             break;
-
         const char *colon = strchr(found + 11, ':');
         if (!colon || colon >= end)
             break;
-
         colon++;
         while (colon < end && (*colon == ' ' || *colon == '\t'))
             colon++;
-
         if (colon + 4 <= end && strncmp(colon, "true", 4) == 0)
             return true;
-
         break;
     }
     return false;
@@ -128,12 +106,14 @@ static String buildHttpRequest(const char *host,
     size_t authLen = 0;
     mbedtls_base64_encode(base64Auth, sizeof(base64Auth), &authLen,
                           (const unsigned char *)authRaw, (size_t)authRawLen);
-    base64Auth[authLen] = '\0';
+    if (authLen < sizeof(base64Auth))
+        base64Auth[authLen] = '\0';
+    else
+        return "";
 
     size_t dataLen = strlen(data);
     String request;
     request.reserve(256 + dataLen);
-
     request = "POST ";
     request += path;
     request += " HTTP/1.0\r\nHost: ";
@@ -144,7 +124,6 @@ static String buildHttpRequest(const char *host,
     request += String(dataLen);
     request += "\r\n\r\n";
     request += data;
-
     return request;
 }
 
