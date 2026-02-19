@@ -2346,7 +2346,7 @@ void Task_NetworkManagement(void *parameter)
     // ============================================================
     if (millis() - lastNetCheck >= 10000)
     {
-      checkWiFi(10000);
+      checkWiFi(5000);
       lastNetCheck = millis();
     }
     if (millis() - lastPingCheck >= PING_INTERVAL)
@@ -2482,8 +2482,6 @@ void Task_NetworkManagement(void *parameter)
           xSemaphoreGive(spiMutex);
         }
       }
-
-      // Cek WiFi (Selalu cek, karena sekarang dual mode)
       wifiStatus = (WiFi.status() == WL_CONNECTED) ? "CONNECTED" : "DISCONNECTED";
       wifiIP = WiFi.localIP().toString();
 

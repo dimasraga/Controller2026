@@ -175,19 +175,15 @@ void checkWiFi(int timeout)
         WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       }
 
-      // Check connection timeout
       if (wifiConnecting && (millis() - wifiConnectStartTime > WIFI_CONNECT_TIMEOUT))
       {
         Serial.println("Warning: WiFi connection timeout.");
         wifiConnecting = false;
 
-        // Jika mode UTAMA adalah WiFi, kita boleh menyerah.
-        // Tapi jika Ethernet, biarkan saja (jangan matikan AP)
         if (networkSettings.networkMode == "WiFi")
         {
-          staConnectionAttemptFailed = true;
-          WiFi.setAutoReconnect(false);
-          WiFi.disconnect(true);
+          wifiConnecting = false;
+          WiFi.disconnect(false);
         }
       }
 
