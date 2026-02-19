@@ -1,0 +1,46 @@
+# IoT Node Setup - Universal Sensor Logger
+
+**IoT Node Setup** is a robust, industrial-grade data acquisition and logging system based on the ESP32 microcontroller. It is designed to interface with various sensors (Analog, Digital, Modbus RTU/TCP) and transmit data to central servers via MQTT or HTTP, with support for both WiFi and Ethernet (W5500) connectivity.
+
+This project was developed during an internship program at ** PT Medion Farma Jaya**.
+
+## 👤 Author
+
+*   **Name:** Dimas Raga
+*   **Instagram:** [@dmsragaa](https://instagram.com/dmsragaa)
+*   **Github:** [dimasraga](https://github.com/dimasraga)
+*   **Affiliation:** Internship Program, Electrical Engineering (Teknik Elektro)
+*   **Institution:** Institut Teknologi Sepuluh Nopember (ITS)
+*   **Year:** 2026
+
+---
+
+## 🛠️ Hardware Requirements
+
+*   **Microcontroller:** ESP32 WROOM 32U
+*   **Ethernet:** W5500 SPI Module
+*   **ADC:** ADS1115 (I2C)
+*   **RTC:** DS3231 (I2C)
+*   **Storage:** Micro SD Card Module (SPI)
+*   **Communication:** RS485 to TTL Module (for Modbus RTU)
+
+### Pin Configuration (Default)
+| Component | ESP32 Pin |
+| :--- | :--- |
+| **Ethernet (W5500)** | CS: 4, MOSI: 23, MISO: 19, SCK: 18, RST: 12 |
+| **SD Card** | CS: 5, MOSI: 23, MISO: 19, SCK: 18 |
+| **ADS1115 (I2C)** | SDA: 21, SCL: 22 |
+| **RTC DS3231** | SDA: 21, SCL: 22 |
+| **RS485 (Serial2)** | RX: 16, TX: 17 |
+| **Digital Inputs** | 32, 33, 25, 26 |
+| **Status LED** | 2 |
+
+---
+
+## 📝 License
+
+This project is proprietary software developed for internal research and development purposes.
+
+---
+
+*Created by Dimas Raga - 2026*
