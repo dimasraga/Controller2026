@@ -2462,7 +2462,6 @@ void Task_NetworkManagement(void *parameter)
       }
     }
     // 6. UTILITY & STATUS
-    // ============================================================
     errorBlinker.update();
     sysMonitor.checkAndPrintWarnings();
     if (millis() - lastStatusPrint >= 5000)
