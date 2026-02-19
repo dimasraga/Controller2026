@@ -98,42 +98,42 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // --- D. Update Grafik (HANYA JIKA HIGHCHARTS SUDAH LOAD) ---
-        // if (chartT && chartS) {
-        //   // 1. Atur Visibilitas (Sekali saja saat awal)
-        //   if (firstRun) {
-        //     for (let i = 0; i < enabled_AI.length && i < 4; i++) {
-        //       const isVisible = enabled_AI[i] === 1;
-        //       if (chartT.series[i]) chartT.series[i].setVisible(isVisible, false);
-        //       if (chartS.series[i]) chartS.series[i].setVisible(isVisible, false);
-        //     }
-        //     chartT.redraw();
-        //     chartS.redraw();
-        //     firstRun = false;
-        //   }
+        if (chartT && chartS) {
+          // 1. Atur Visibilitas (Sekali saja saat awal)
+          if (firstRun) {
+            for (let i = 0; i < enabled_AI.length && i < 4; i++) {
+              const isVisible = enabled_AI[i] === 1;
+              if (chartT.series[i]) chartT.series[i].setVisible(isVisible, false);
+              if (chartS.series[i]) chartS.series[i].setVisible(isVisible, false);
+            }
+            chartT.redraw();
+            chartS.redraw();
+            firstRun = false;
+          }
 
-        //   // 2. Tentukan Waktu X-Axis (Gunakan Waktu Browser agar Grafik Mulus)
-        //   let x = (new Date()).getTime();
+          // 2. Tentukan Waktu X-Axis (Gunakan Waktu Browser agar Grafik Mulus)
+          let x = (new Date()).getTime();
 
-        //   // 3. Plot Data Raw
-        //   const sensorRawValues = AI_rawValues.map(v => Math.round((v || 0) * 100) / 100);
-        //   sensorRawValues.forEach((y, i) => {
-        //     if (enabled_AI[i] === 1 && chartT.series[i]) {
-        //       const shift = chartT.series[i].data.length > 300;
-        //       chartT.series[i].addPoint([x, y], false, shift, true);
-        //     }
-        //   });
-        //   chartT.redraw();
+          // 3. Plot Data Raw
+          const sensorRawValues = AI_rawValues.map(v => Math.round((v || 0) * 100) / 100);
+          sensorRawValues.forEach((y, i) => {
+            if (enabled_AI[i] === 1 && chartT.series[i]) {
+              const shift = chartT.series[i].data.length > 300;
+              chartT.series[i].addPoint([x, y], false, shift, true);
+            }
+          });
+          chartT.redraw();
 
-        //   // 4. Plot Data Scaled
-        //   const sensorScaledValues = AI_scaledValues.map(v => Math.round((v || 0) * 100) / 100);
-        //   sensorScaledValues.forEach((y, i) => {
-        //     if (enabled_AI[i] === 1 && chartS.series[i]) {
-        //       const shift = chartS.series[i].data.length > 300;
-        //       chartS.series[i].addPoint([x, y], false, shift, true);
-        //     }
-        //   });
-        //   chartS.redraw();
-        // } // <--- INI YANG HILANG SEBELUMNYA
+          // 4. Plot Data Scaled
+          const sensorScaledValues = AI_scaledValues.map(v => Math.round((v || 0) * 100) / 100);
+          sensorScaledValues.forEach((y, i) => {
+            if (enabled_AI[i] === 1 && chartS.series[i]) {
+              const shift = chartS.series[i].data.length > 300;
+              chartS.series[i].addPoint([x, y], false, shift, true);
+            }
+          });
+          chartS.redraw();
+        } // <--- INI YANG HILANG SEBELUMNYA
       })
       .catch(err => console.error('Data fetch error:', err));
   }

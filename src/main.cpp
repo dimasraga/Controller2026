@@ -2961,7 +2961,7 @@ void Task_DataLogger(void *parameter)
     // 1. UPDATE DATA JSON
     if (xQueueReceive(queueSensorData, &sensorData, 0) == pdTRUE)
     {
-      if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200))) 
+      if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
       {
         for (byte i = 1; i < jumlahInputAnalog + 1; i++)
         {
@@ -2991,16 +2991,22 @@ void Task_DataLogger(void *parameter)
     }
 
     // 2. PERIODIC DATA SENDING
-    // 2. PERIODIC DATA SENDING
-    if (millis() - lastSendTime >= (networkSettings.sendInterval * 1000))
+    if ((millis() - lastSendTime >= (unsigned long)(networkSettings.sendInterval * 1000)) || flagSend)
     {
+      flagSend = false;
+      lastSendTime = millis();
+
       if (networkSettings.loggerMode != "Disabled")
       {
         Serial.printf("Target   : %s\n", networkSettings.endpoint.c_str());
 
         if (networkSettings.protocolMode == "HTTP")
         {
-          struct SensorItem { String key; float value; };
+          struct SensorItem
+          {
+            String key;
+            float value;
+          };
           SensorItem dataList[30];
           int dataCount = 0;
 
@@ -3009,11 +3015,13 @@ void Task_DataLogger(void *parameter)
             for (JsonPair kv : jsonSend.as<JsonObject>())
             {
               String key = kv.key().c_str();
-              if (key == "-" || key == "" || key.endsWith("_mode")) continue;
-              if (dataCount < 30) {
-                 dataList[dataCount].key = key;
-                 dataList[dataCount].value = kv.value().as<String>().toFloat();
-                 dataCount++;
+              if (key == "-" || key == "" || key.endsWith("_mode"))
+                continue;
+              if (dataCount < 30)
+              {
+                dataList[dataCount].key = key;
+                dataList[dataCount].value = kv.value().as<String>().toFloat();
+                dataCount++;
               }
             }
             xSemaphoreGive(jsonMutex); // Released safely once outside the loop
@@ -3035,8 +3043,9 @@ void Task_DataLogger(void *parameter)
               sendDataHTTP(sendString, networkSettings.endpoint, networkSettings.mqttUsername, networkSettings.mqttPassword, 0);
               xSemaphoreGive(spiMutex);
             }
-            else Serial.println("❌ SKIP (SPI Busy)");
-            
+            else
+              Serial.println("❌ SKIP (SPI Busy)");
+
             vTaskDelay(pdMS_TO_TICKS(300));
           }
         }
@@ -3052,10 +3061,13 @@ void Task_DataLogger(void *parameter)
           Serial.print("[SENDER] Sending via MQTT... ");
           if (mqtt.connected() && networkSettings.pubTopic.length() > 0)
           {
-            if (mqtt.publish(networkSettings.pubTopic.c_str(), mqttPayload.c_str())) {
+            if (mqtt.publish(networkSettings.pubTopic.c_str(), mqttPayload.c_str()))
+            {
               Serial.println("✅ SUCCESS");
               networkSettings.connStatus = "Connected";
-            } else {
+            }
+            else
+            {
               Serial.println("❌ FAIL");
             }
           }
@@ -5023,7 +5035,7 @@ void handleFormSubmit(AsyncWebServerRequest *request)
 
     // Ambil Mutex JSON saat mengubah variabel global config
     // Ini mencegah Data Acquisition Task membaca data "setengah matang"
-    if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200))) 
+    if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
     {
       for (unsigned char i = 1; i <= jumlahInputDigital; i++)
       {
@@ -5182,7 +5194,7 @@ void handleFormSubmit(AsyncWebServerRequest *request)
 void saveToJson(const char *dir, const char *configType)
 {
   // 1. Pastikan ambil Mutex dulu agar tidak bentrok dengan pembacaan sensor
-  if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200))) 
+  if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
   {
     // Gunakan buffer cukup besar (4KB) untuk menampung JSON config
     DynamicJsonDocument docSave(4096);

@@ -19,17 +19,18 @@ public:
         uint8_t heapPct = (totalHeap > 0) ? ((totalHeap - freeHeap) * 100) / totalHeap : 0;
 
         Serial.println(F("\n--- [ SYS MONITOR ] ---"));
-
-        Serial.printf("RAM : %u / %u bytes (%u%% used)\n", freeHeap, totalHeap, heapPct);
-        Serial.printf("MIN : %u bytes (Lowest)\n", minFreeHeap);
-
-        if (ESP.getPsramSize() > 0)
-        {
+        
+        // Menggunakan printf jauh lebih hemat daripada String() + String()
+        Serial.printf("HEAP : %u / %u bytes (%u%% used)\n", freeHeap, totalHeap, heapPct);
+        Serial.printf("MIN  : %u bytes (Lowest)\n", minFreeHeap);
+        
+        // PSRAM (Jika ada)
+        if (ESP.getPsramSize() > 0) {
             Serial.printf("PSRAM: %u / %u bytes\n", ESP.getFreePsram(), ESP.getPsramSize());
         }
 
         Serial.printf("TASK : %u active\n", uxTaskGetNumberOfTasks());
-        Serial.printf("UPTIME   : %lu sec\n", millis() / 1000);
+        Serial.printf("UP   : %lu sec\n", millis() / 1000);
         Serial.println(F("-----------------------"));
     }
 
