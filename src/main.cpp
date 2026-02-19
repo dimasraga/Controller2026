@@ -2462,8 +2462,6 @@ void Task_NetworkManagement(void *parameter)
         xSemaphoreGive(modbusMutex);
       }
     }
-
-    // ============================================================
     // 6. UTILITY & STATUS
     // ============================================================
     errorBlinker.update();
