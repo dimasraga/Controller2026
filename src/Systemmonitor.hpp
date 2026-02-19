@@ -14,7 +14,6 @@ public:
         uint32_t freeHeap = ESP.getFreeHeap();
         uint32_t totalHeap = ESP.getHeapSize();
         uint32_t minFreeHeap = ESP.getMinFreeHeap();
-
         uint8_t heapPct = (totalHeap > 0) ? ((totalHeap - freeHeap) * 100) / totalHeap : 0;
 
         Serial.println(F("\n--- [ SYS MONITOR ] ---"));
