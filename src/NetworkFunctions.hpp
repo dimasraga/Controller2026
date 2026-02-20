@@ -137,16 +137,13 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
 // =================================================================
 void checkWiFi(int timeout)
 {
-  // UBAH KONDISI IF INI:
-  // Ijinkan cek WiFi jika mode = WiFi ATAU (Mode = Ethernet DAN ada SSID tersimpan)
   if (networkSettings.networkMode == "WiFi" || (networkSettings.networkMode == "Ethernet" && networkSettings.ssid.length() > 1))
   {
-    if (staConnectionAttemptFailed)
-    {
-      // Jika di mode Ethernet, kita tidak perlu terlalu agresif mematikan STA
-      // Tapi biarkan logika ini berjalan untuk menghemat resource jika WiFi gagal terus
-      return;
-    }
+    // Di mode Ethernet: STA tetap berjalan meski pernah gagal, WiFi hanya backup
+    // if (staConnectionAttemptFailed && networkSettings.networkMode == "WiFi")
+    // {
+    //   return;
+    // }
 
     // Update MAC jika belum ada
     if (networkSettings.macAddress.length() < 10)
@@ -176,6 +173,8 @@ void checkWiFi(int timeout)
         wifiConnecting = false;
         WiFi.disconnect(true);
         delay(500);
+        // Reset di semua mode agar bisa retry otomatis
+        staConnectionAttemptFailed = false;
       }
       // Handle successful connection
       if (status == WL_CONNECTED)
@@ -539,17 +538,17 @@ void configNetwork()
       Serial.println("  ✗ Failed to start AP");
       apReady = false;
     }
+    // Selalu aktifkan STA di mode Ethernet jika ada SSID, tidak ada early exit
+    esp_wifi_set_mac(WIFI_IF_STA, mac);
+    staConnectionAttemptFailed = false;
+    wifiConnected = false;
     if (networkSettings.ssid.length() > 1)
     {
-      Serial.printf("  ✓ Starting WiFi Background Connection to: %s\n", networkSettings.ssid.c_str());
-      esp_wifi_set_mac(WIFI_IF_STA, mac);
+      Serial.printf("  ✓ Starting WiFi STA to: %s\n", networkSettings.ssid.c_str());
       WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       wifiConnecting = true;
       wifiConnectStartTime = millis();
-      staConnectionAttemptFailed = false;
-      wifiConnected = false;
     }
-
     // =====================================================================
     // STEP 2: Hardware Reset W5500
     // =====================================================================

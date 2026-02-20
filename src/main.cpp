@@ -538,7 +538,15 @@ void handleEthernetClient()
       }
       saveToJson("/configNetwork.json", "network");
       saveToSDConfig("/configNetwork.json", "network");
-      client.print("Network Saved");
+      client.println("HTTP/1.1 200 OK");
+      client.println("Content-Type: text/plain");
+      client.println("Connection: close");
+      client.println();
+      client.print("Network saved. Restarting...");
+      client.flush();
+      client.stop();
+      delay(500);
+      ESP.restart();
     }
 
     // --- 4. SAVE MODBUS SETUP ---
@@ -3603,10 +3611,11 @@ void handleFormSubmit(AsyncWebServerRequest *request)
         modbusParam.slaveID = request->arg("modbusSlaveID").toInt();
     }
     configureSendTriggerInterrupt(networkSettings);
-    request->send(200, "text/plain", "Form data received");
-    // Simpan ke Internal & SD Card
     saveToJson("/configNetwork.json", "network");
     saveToSDConfig("/configNetwork.json", "network");
+    request->send(200, "text/plain", "Network saved. Restarting...");
+    delay(500);
+    ESP.restart();
   }
 
   // ========================================================================
