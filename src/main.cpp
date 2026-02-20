@@ -4559,7 +4559,8 @@ void readConfig()
         networkSettings.mqttUsername = String(temp);
         temp = doc["mqttPass"];
         networkSettings.mqttPassword = String(temp);
-        networkSettings.sendInterval = doc["sendInterval"];
+        // networkSettings.sendInterval = doc["sendInterval"];
+        if (doc.containsKey("sendInterval")) networkSettings.sendInterval = doc["sendInterval"];
         temp = doc["sendTrig"];
         networkSettings.sendTrig = String(temp);
         networkSettings.port = doc["port"];

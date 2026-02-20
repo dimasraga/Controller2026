@@ -47,7 +47,7 @@ struct Network
   String erpUsername, erpPassword, erpUrl;
   String loggerMode;
   int port;
-  float sendInterval;
+  float sendInterval = 1.0f;
   int sdSaveInterval = 5; // <-- TAMBAHAN: Default 5 menit
 } networkSettings;
 
