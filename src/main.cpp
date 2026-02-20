@@ -4470,7 +4470,7 @@ String getTimeDateNow()
     }
   }
 
-  char timeBuffer[20];
+  char timeBuffer[32];
   sprintf(timeBuffer, "%04d-%02d-%02d %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
   // timestamp = year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
   return String(timeBuffer);

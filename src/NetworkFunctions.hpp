@@ -302,12 +302,14 @@ void configNetwork()
     Serial.println("[1/7] Resetting WiFi...");
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
-    delay(1000); // PENTING: Kasih waktu WiFi fully off
+    delay(500);
 
-    // =====================================================================
-    // STEP 2: Set MAC Address (SEBELUM WiFi ON)
-    // =====================================================================
-    Serial.println("[2/7] Setting MAC Address...");
+    // MAC harus di-set setelah mode WIFI_STA/AP_STA aktif, bukan saat WIFI_OFF
+    Serial.println("[2/7] Setting WiFi mode to AP+STA...");
+    WiFi.mode(WIFI_AP_STA);
+    delay(500);
+
+    Serial.println("[3/7] Setting MAC Address...");
     esp_err_t err = esp_wifi_set_mac(WIFI_IF_STA, mac);
     if (err == ESP_OK)
     {
@@ -318,15 +320,7 @@ void configNetwork()
     {
       Serial.println("  ✗ Failed to set MAC Address");
     }
-
-    // =====================================================================
-    // STEP 3: Configure WiFi Mode (AP+STA)
-    // =====================================================================
-    Serial.println("[3/7] Setting WiFi mode to AP+STA...");
-    WiFi.mode(WIFI_AP_STA);
-    delay(500);
-    Serial.println("  ✓ Mode set to AP+STA");
-
+    delay(200);
     // =====================================================================
     // STEP 4: Setup WiFi Events
     // =====================================================================
@@ -415,7 +409,7 @@ void configNetwork()
     bool apStarted = WiFi.softAP(
         networkSettings.apSsid.c_str(),     // SSID
         networkSettings.apPassword.c_str(), // Password
-        6,                                  // Channel (fixed ke 6)
+        1,                                  // Channel (fixed ke 6)
         0,                                  // SSID Hidden (0=visible, 1=hidden)
         4                                   // Max connections
     );
@@ -506,11 +500,9 @@ void configNetwork()
     mqtt = PubSubClient(esp32);
     checkTime = millis();
 
-    // =================================================================
     // LOGIKA BARU: Jangan auto-reconnect di awal!
-    // =================================================================
-    WiFi.setAutoReconnect(false); // <--- DIUBAH DARI true
-    WiFi.persistent(false);       // Jangan save ke flash terus-menerus
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(false);
 
     wifiConnecting = true;
     wifiConnectStartTime = millis();
