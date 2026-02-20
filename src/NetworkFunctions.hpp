@@ -112,9 +112,7 @@ IpAddressSplit parsingIP(String data)
 void mqttCallback(char *topic, byte *payload, unsigned int length)
 {
   Serial.println("MQTT Message Received");
-  String command = "";
-  for (int j = 0; j < length; j++)
-    command += (char)payload[j];
+  String command(reinterpret_cast<const char *>(payload), length); // construct sekali, tanpa loop
   Serial.println(command);
 
   StaticJsonDocument<200> commandJson;

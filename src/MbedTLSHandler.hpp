@@ -20,8 +20,6 @@
 #define TCP_SEND_FLUSH_DELAY_MS 1U
 #define BASE64_AUTH_SIZE 352U
 static const int PREFERRED_CIPHERS[] = {
-    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_RSA_WITH_AES_128_GCM_SHA256,
     0};
 #define MBEDTLS_DEBUG_ENABLE
@@ -189,22 +187,45 @@ int perform_https_request_mbedtls(EthernetClient &ethClient,
 {
     int ret = -1;
 
-    mbedtls_entropy_context *entropy = new mbedtls_entropy_context();
-    mbedtls_ctr_drbg_context *ctr_drbg = new mbedtls_ctr_drbg_context();
-    mbedtls_ssl_context *ssl = new mbedtls_ssl_context();
-    mbedtls_ssl_config *conf = new mbedtls_ssl_config();
-    mbedtls_x509_crt *cacert = new mbedtls_x509_crt();
+    // mbedtls_entropy_context *entropy = new mbedtls_entropy_context();
+    // mbedtls_ctr_drbg_context *ctr_drbg = new mbedtls_ctr_drbg_context();
+    // mbedtls_ssl_context *ssl = new mbedtls_ssl_context();
+    // mbedtls_ssl_config *conf = new mbedtls_ssl_config();
+    // mbedtls_x509_crt *cacert = new mbedtls_x509_crt();
 
-    if (!entropy || !ctr_drbg || !ssl || !conf || !cacert)
+    // if (!entropy || !ctr_drbg || !ssl || !conf || !cacert)
+    // {
+    //     TLS_LOG("[TLS] HEAP FAIL: free=%u\n", (unsigned)ESP.getFreeHeap());
+    //     delete entropy;
+    //     delete ctr_drbg;
+    //     delete ssl;
+    //     delete conf;
+    //     delete cacert;
+    //     return -1;
+    // }
+
+    // Alokasi dalam satu struct untuk minimalkan fragmentasi heap
+    struct TLSContext
+    {
+        mbedtls_entropy_context entropy;
+        mbedtls_ctr_drbg_context ctr_drbg;
+        mbedtls_ssl_context ssl;
+        mbedtls_ssl_config conf;
+        mbedtls_x509_crt cacert;
+    };
+
+    TLSContext *ctx = new TLSContext();
+    if (!ctx)
     {
         TLS_LOG("[TLS] HEAP FAIL: free=%u\n", (unsigned)ESP.getFreeHeap());
-        delete entropy;
-        delete ctr_drbg;
-        delete ssl;
-        delete conf;
-        delete cacert;
         return -1;
     }
+
+    mbedtls_entropy_context *entropy = &ctx->entropy;
+    mbedtls_ctr_drbg_context *ctr_drbg = &ctx->ctr_drbg;
+    mbedtls_ssl_context *ssl = &ctx->ssl;
+    mbedtls_ssl_config *conf = &ctx->conf;
+    mbedtls_x509_crt *cacert = &ctx->cacert;
 
     mbedtls_ssl_init(ssl);
     mbedtls_ssl_config_init(conf);
@@ -450,18 +471,17 @@ int perform_https_request_mbedtls(EthernetClient &ethClient,
 cleanup:
     mbedtls_ssl_close_notify(ssl);
     ethClient.stop();
-
     mbedtls_ssl_free(ssl);
     mbedtls_ssl_config_free(conf);
     mbedtls_x509_crt_free(cacert);
     mbedtls_ctr_drbg_free(ctr_drbg);
     mbedtls_entropy_free(entropy);
-
-    delete ssl;
-    delete conf;
-    delete cacert;
-    delete ctr_drbg;
-    delete entropy;
+    delete ctx;
+    // delete ssl;
+    // delete conf;
+    // delete cacert;
+    // delete ctr_drbg;
+    // delete entropy;
 
     TLS_LOG("[HTTPS] Closed\n\n");
     return (ret == 0) ? 200 : -1;
