@@ -404,7 +404,7 @@ void configNetwork()
     Serial.println("    Channel: 6 (fixed, tidak bentrok)");
     Serial.println("    Hidden: No");
     Serial.println("    Max Clients: 4");
-
+    WiFi.softAPConfig(IPAddress(10, 22, 7, 3), IPAddress(10, 22, 7, 1), IPAddress(255, 255, 255, 0)); // Set custom AP IP
     // KUNCI: Gunakan channel yang berbeda dari STA
     bool apStarted = WiFi.softAP(
         networkSettings.apSsid.c_str(),     // SSID
@@ -533,6 +533,7 @@ void configNetwork()
 
     // Start Access Point untuk konfigurasi
     Serial.println("[1/5] Starting Access Point...");
+    WiFi.softAPConfig(IPAddress(10, 22, 7, 3), IPAddress(10, 22, 7, 1), IPAddress(255, 255, 255, 0)); // Set custom AP IP
     bool apStarted = WiFi.softAP(networkSettings.apSsid.c_str(),
                                  networkSettings.apPassword.c_str(), 6, 0, 4);
 
@@ -748,10 +749,17 @@ void sendDataHTTP(String data, String serverPath, String httpUsername, String ht
   httpRequestInProgress = true;
   httpRequestStartTime = millis();
 
+  // bool success = false;
+  // bool isEthMode = (networkSettings.networkMode == "Ethernet");
+  // bool isEthReady = isEthMode && (Ethernet.linkStatus() == LinkON);
+  // bool isWifiReady = (!isEthMode) && (WiFi.status() == WL_CONNECTED);
+
   bool success = false;
-  bool isEthMode = (networkSettings.networkMode == "Ethernet");
-  bool isEthReady = isEthMode && (Ethernet.linkStatus() == LinkON);
-  bool isWifiReady = (!isEthMode) && (WiFi.status() == WL_CONNECTED);
+  // Fallback to WiFi STA if Ethernet link drops by removing the !isEthMode constraint
+  bool isEthReady = (networkSettings.networkMode == "Ethernet") && (Ethernet.linkStatus() == LinkON);
+  bool isWifiReady = (WiFi.status() == WL_CONNECTED);
+
+  // 1. Eksekusi Berdasarkan Mode
 
   // 1. Eksekusi Berdasarkan Mode
   if (isEthReady)

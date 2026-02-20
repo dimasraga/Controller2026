@@ -35,10 +35,14 @@ struct Network
 {
   String ssid, password, networkMode, protocolMode, endpoint, pubTopic, subTopic, protocolMode2;
   String apSsid, apPassword, dhcpMode, mqttUsername, mqttPassword, loginUsername = "admin", loginPassword = "admin";
-  String ipAddress = "192.168.4.1";  
-  String subnetMask = "255.255.255.0"; 
-  String ipGateway = "192.168.1.1";    
-  String ipDNS = "192.168.1.1";        
+  // String ipAddress = "192.168.4.1";
+  // String subnetMask = "255.255.255.0";
+  // String ipGateway = "192.168.1.1";
+  // String ipDNS = "192.168.1.1";
+  String ipAddress = "10.22.7.3"; // Default Static IP for STA mode
+  String subnetMask = "255.255.255.0";
+  String ipGateway = "10.22.7.1";
+  String ipDNS = "1.1.1.1.";
   String macAddress, connStatus = "Not Connected", sendTrig;
   String erpUsername, erpPassword, erpUrl;
   String loggerMode;

@@ -1843,7 +1843,7 @@ void handleEthernetClient()
         networkSettings.erpUsername = getValue("erpUsername");
         networkSettings.erpPassword = getValue("erpPassword");
       }
-      else
+      if (getValue("networkMode") != "")
       {
         networkSettings.networkMode = getValue("networkMode");
         networkSettings.dhcpMode = getValue("dhcpMode");
@@ -4947,7 +4947,7 @@ void handleFormSubmit(AsyncWebServerRequest *request)
   // ========================================================================
   // 2. SAVE ERP CONFIGURATION (URL, User, Pass)
   // ========================================================================
-  else if (request->hasArg("erpUrl"))
+  if (request->hasArg("erpUrl"))
   {
     networkSettings.erpUrl = request->arg("erpUrl");
     networkSettings.erpUsername = request->arg("erpUsername");
