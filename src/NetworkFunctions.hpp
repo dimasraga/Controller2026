@@ -68,11 +68,8 @@ bool wifiConnected = false;
 bool wifiConnecting = false;
 bool apReady = false;
 unsigned long wifiConnectStartTime = 0;
-// PERUBAHAN 1: Ubah timeout ke 10 detik (sesuai permintaan)
 const unsigned long WIFI_CONNECT_TIMEOUT = 10000; // 10 detik timeout (sebelumnya 30000)
-
-// PERUBAHAN 2: Tambahkan flag "menyerah"
-bool staConnectionAttemptFailed = false; // Flag untuk berhenti mencoba koneksi STA
+bool staConnectionAttemptFailed = false;          // Flag untuk berhenti mencoba koneksi STA
 
 // Function declarations
 IpAddressSplit parsingIP(String data);
@@ -177,14 +174,9 @@ void checkWiFi(int timeout)
       {
         Serial.println("Warning: WiFi connection timeout.");
         wifiConnecting = false;
-
-        if (networkSettings.networkMode == "WiFi")
-        {
-          wifiConnecting = false;
-          WiFi.disconnect(false);
-        }
+        WiFi.disconnect(true);
+        delay(500);
       }
-
       // Handle successful connection
       if (status == WL_CONNECTED)
       {
@@ -913,7 +905,7 @@ void sendBackupData()
       {
         EthernetClient ethClient;
         ethClient.setTimeout(5000);
-        String serverPath = "https://sensor-logger-trial.medionindonesia.com/api/v1/AddBackupList";
+        String serverPath = "https://api-logger-dev2.medionindonesia.com/api/v1/UpdateLoggingRealtime";
 
         int result = perform_https_request_mbedtls(
             ethClient,
@@ -931,7 +923,7 @@ void sendBackupData()
         WiFiClientSecure client;
         HTTPClient https;
         client.setInsecure();
-        if (https.begin(client, "https://sensor-logger-trial.medionindonesia.com/api/v1/AddBackupList"))
+        if (https.begin(client, "https://api-logger-dev2.medionindonesia.com/api/v1/UpdateLoggingRealtime"))
         {
           https.setAuthorization(networkSettings.mqttUsername.c_str(), networkSettings.mqttPassword.c_str());
           https.addHeader("Content-Type", "application/json");
@@ -1010,4 +1002,4 @@ long measureLatency(String url)
   }
   return connected ? (millis() - start) : -1;
 }
-#endif // NETWORK_FUNCTIONS_HPP
+#endif

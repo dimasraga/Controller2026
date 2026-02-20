@@ -91,14 +91,14 @@ struct DigitalInput
   unsigned long intervalTime, lastMillisPulseMode;
   float conversionFactor;
   byte pin;
-} ;
+};
 extern DigitalInput digitalInput[jumlahInputDigital + 1];
 
 struct DigitalOutput
 {
   String name;
   bool inv, value;
-} ;
+};
 extern DigitalOutput digitalOutput[jumlahOutputDigital + 1];
 
 struct ModbusParam
@@ -109,7 +109,7 @@ struct ModbusParam
   String parity;
   int port, slaveID;
   String mode;
-} ;
+};
 extern ModbusParam modbusParam;
 
 struct IpAddressSplit
