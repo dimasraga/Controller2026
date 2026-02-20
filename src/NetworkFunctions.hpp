@@ -758,8 +758,6 @@ void sendDataHTTP(String data, String serverPath, String httpUsername, String ht
   bool isWifiReady = (WiFi.status() == WL_CONNECTED);
 
   // 1. Eksekusi Berdasarkan Mode
-
-  // 1. Eksekusi Berdasarkan Mode
   if (isEthReady)
   {
     EthernetClient ethClient;
@@ -886,21 +884,22 @@ void sendBackupData()
     int bytesRead = dataOffline.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
     lineBuffer[bytesRead] = '\0'; // Null-terminator
 
-    String line = String(lineBuffer);
-    line.trim();
-
-    if (line.length() < 5)
+    // Trim in-place pada buffer C
+    int start = 0, end = bytesRead - 1;
+    while (start <= end && isspace((uint8_t)lineBuffer[start]))
+      start++;
+    while (end >= start && isspace((uint8_t)lineBuffer[end]))
+      end--;
+    if (end - start < 4)
       continue;
-
-    // Bersihkan kurung siku tanpa fungsi replace() yang berat
-    if (line.startsWith("["))
-      line = line.substring(1);
-    if (line.endsWith("]"))
-      line = line.substring(0, line.length() - 1);
-
+    if (lineBuffer[start] == '[')
+      start++;
+    if (lineBuffer[end] == ']')
+      end--;
+    lineBuffer[end + 1] = '\0';
     if (count > 0)
-      payload += ",";
-    payload += line;
+      payload += ',';
+    payload += (lineBuffer + start);
     count++;
 
     // Kirim setiap 10 data

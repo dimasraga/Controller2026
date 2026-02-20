@@ -42,14 +42,15 @@ struct Network
   String ipAddress = "10.22.7.3"; // Default Static IP for STA mode
   String subnetMask = "255.255.255.0";
   String ipGateway = "10.22.7.1";
-  String ipDNS = "1.1.1.1.";
+  String ipDNS = "1.1.1.1";
   String macAddress, connStatus = "Not Connected", sendTrig;
   String erpUsername, erpPassword, erpUrl;
   String loggerMode;
   int port;
-  float sendInterval = 1.0f;
-  int sdSaveInterval = 5; // <-- TAMBAHAN: Default 5 menit
-} networkSettings;
+  float sendInterval = 1.0f; // kirim ke server 1 menit
+  int sdSaveInterval = 5;    // <-- TAMBAHAN: Default 5 menit
+};
+extern Network networkSettings;
 
 // struct Network
 // {
@@ -73,7 +74,8 @@ struct AnalogInput
   bool calibration;
   float mValue, cValue, lowLimit, highLimit, filterPeriod;
   byte pin;
-} analogInput[jumlahInputAnalog + 1];
+};
+extern AnalogInput analogInput[jumlahInputAnalog + 1];
 
 struct DigitalInput
 {
@@ -89,13 +91,15 @@ struct DigitalInput
   unsigned long intervalTime, lastMillisPulseMode;
   float conversionFactor;
   byte pin;
-} digitalInput[jumlahInputDigital + 1];
+} ;
+extern DigitalInput digitalInput[jumlahInputDigital + 1];
 
-struct DigialOutput
+struct DigitalOutput
 {
   String name;
   bool inv, value;
-} digitalOutput[jumlahOutputDigital + 1];
+} ;
+extern DigitalOutput digitalOutput[jumlahOutputDigital + 1];
 
 struct ModbusParam
 {
@@ -105,11 +109,12 @@ struct ModbusParam
   String parity;
   int port, slaveID;
   String mode;
-} modbusParam;
+} ;
+extern ModbusParam modbusParam;
 
 struct IpAddressSplit
 {
-  int ip[5];
+  int ip[4];
 };
 
 void IRAM_ATTR isrPulseMode1()

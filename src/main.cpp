@@ -67,7 +67,11 @@ PubSubClient mqtt;
 // ============================================================================
 // GLOBAL VARIABLES
 // ============================================================================
-
+Network networkSettings; // Allocate memory here
+AnalogInput analogInput[jumlahInputAnalog + 1];
+DigitalInput digitalInput[jumlahInputDigital + 1];
+DigitalOutput digitalOutput[jumlahOutputDigital + 1];
+ModbusParam modbusParam;
 unsigned long timeElapsed;
 unsigned long lastSDSaveTime = 0;
 // ADS1115 ads;
