@@ -546,7 +546,6 @@ void handleEthernetClient()
       client.flush();
       client.stop();
       delay(500);
-      ESP.restart();
     }
 
     // --- 4. SAVE MODBUS SETUP ---
@@ -2047,7 +2046,7 @@ void setupWebServer()
       if (shouldReboot) {
         ESP_LOGI("OTA", "Update successful, rebooting...");
         delay(2000);
-        ESP.restart();
+  
       } else {
         ESP_LOGE("OTA", "Update failed");
         errorMessages.addMessage(getTimeNow() + " - OTA Update Failed");
@@ -2173,7 +2172,7 @@ void setupWebServer()
       request->send(200, "text/plain", "OKKK");
       ESP_LOGI("ESP", "ESP will restart");
       delay(2000);
-      ESP.restart();
+
     }
     doc = DynamicJsonDocument(4096);
     doc["networkMode"] = networkSettings.networkMode;

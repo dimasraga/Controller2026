@@ -139,7 +139,6 @@ void checkWiFi(int timeout)
 {
   if (networkSettings.networkMode == "WiFi" || (networkSettings.networkMode == "Ethernet" && networkSettings.ssid.length() > 1))
   {
-    // Di mode Ethernet: STA tetap berjalan meski pernah gagal, WiFi hanya backup
     // if (staConnectionAttemptFailed && networkSettings.networkMode == "WiFi")
     // {
     //   return;
@@ -348,10 +347,7 @@ void configNetwork()
                      Serial.printf("  → Error code: %d\n", info.wifi_sta_disconnected.reason);
                    }
 
-                   wifiConnected = false;
-                   // Jangan panggil reconnect di sini, biarkan checkWiFi() yang handle
-                   // Serial.println("  → Will retry connection...");
-                 },
+                   wifiConnected = false; },
                  ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
@@ -538,16 +534,22 @@ void configNetwork()
       Serial.println("  ✗ Failed to start AP");
       apReady = false;
     }
-    // Selalu aktifkan STA di mode Ethernet jika ada SSID, tidak ada early exit
+    // STA selalu aktif di mode Ethernet, jika ada SSID langsung connect
     esp_wifi_set_mac(WIFI_IF_STA, mac);
     staConnectionAttemptFailed = false;
     wifiConnected = false;
     if (networkSettings.ssid.length() > 1)
     {
       Serial.printf("  ✓ Starting WiFi STA to: %s\n", networkSettings.ssid.c_str());
+      WiFi.setAutoReconnect(true);
+      WiFi.persistent(false);
       WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       wifiConnecting = true;
       wifiConnectStartTime = millis();
+    }
+    else
+    {
+      Serial.println("  ⚠ No SSID configured, WiFi STA idle (AP still active)");
     }
     // =====================================================================
     // STEP 2: Hardware Reset W5500
