@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "esp_system.h"
 #include "esp_heap_caps.h"
+
 class SystemMonitor
 {
 public:
@@ -36,8 +37,10 @@ public:
             Serial.printf("⚠️ LOW STACK: %u bytes left!\n", stackLeft);
         }
     }
+
     void begin()
     {
     }
 };
+
 #endif

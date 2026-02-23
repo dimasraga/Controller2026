@@ -39,7 +39,7 @@ struct Network
   // String subnetMask = "255.255.255.0";
   // String ipGateway = "192.168.1.1";
   // String ipDNS = "192.168.1.1";
-  String ipAddress = "10.22.7.3"; // Default Static IP for STA mode
+  String ipAddress = "10.22.7.3";
   String subnetMask = "255.255.255.0";
   String ipGateway = "10.22.7.1";
   String ipDNS = "1.1.1.1";

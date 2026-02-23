@@ -512,6 +512,7 @@ void handleEthernetClient()
         networkSettings.mqttPassword = getValue("mqttPass");
         networkSettings.pubTopic = getValue("pubTopic");
         networkSettings.subTopic = getValue("subTopic");
+        networkSettings.loggerMode = getValue("loggerMode").length() > 0 ? getValue("loggerMode") : "Disabled";
 
         if (getValue("modbusMode") != "")
         {
@@ -523,10 +524,10 @@ void handleEthernetClient()
       }
       saveToJson("/configNetwork.json", "network");
       saveToSDConfig("/configNetwork.json", "network");
-      client.println("HTTP/1.1 200 OK");
-      client.println("Content-Type: text/plain");
-      client.println("Connection: close");
-      client.println();
+      // client.println("HTTP/1.1 200 OK");
+      // client.println("Content-Type: text/plain");
+      // client.println("Connection: close");
+      // client.println();
       client.print("Network saved. Restarting...");
       client.flush();
       client.stop();
@@ -1640,10 +1641,52 @@ void Task_DataLogger(void *parameter)
     }
 
     // 2. PERIODIC DATA SENDING
+    // 2. PERIODIC DATA SENDING + SD SAVE (atomik)
     if ((millis() - lastSendTime >= (unsigned long)(networkSettings.sendInterval * 1000)) || flagSend)
     {
       flagSend = false;
       lastSendTime = millis();
+
+      // Siapkan data SD sekali, dipakai untuk send dan save
+      String dataToSave = "";
+      if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
+      {
+        docSD.clear();
+        JsonArray arraySD = docSD.to<JsonArray>();
+        for (JsonPair kv : jsonSend.as<JsonObject>())
+        {
+          if (kv.key() == "-" || String(kv.key().c_str()).endsWith("_mode"))
+            continue;
+          JsonObject nestedObj = arraySD.createNestedObject();
+          nestedObj["KodeSensor"] = kv.key().c_str();
+          if (jobNum.length() > 4)
+          {
+            JsonObject additional = nestedObj.createNestedObject("additional");
+            additional["jobnum"] = jobNum.c_str();
+          }
+          nestedObj["StringWaktu"] = getTimeDateNow();
+          nestedObj["Value"] = String(kv.value().as<float>());
+        }
+        serializeJson(docSD, dataToSave);
+        xSemaphoreGive(jsonMutex);
+      }
+
+      // SD Save - setiap kali send
+      if (dataToSave.length() > 10)
+      {
+        if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(500)))
+        {
+          if (xSemaphoreTake(spiMutex, pdMS_TO_TICKS(2000)))
+          {
+            saveToSD(dataToSave);
+            xSemaphoreGive(spiMutex);
+            lastSDSave = millis(); // reset timer fallback
+          }
+          else
+            Serial.println("⚠️ SD Save Skipped (SPI Busy)");
+          xSemaphoreGive(sdMutex);
+        }
+      }
 
       if (networkSettings.loggerMode != "Disabled")
       {
@@ -1673,7 +1716,7 @@ void Task_DataLogger(void *parameter)
                 dataCount++;
               }
             }
-            xSemaphoreGive(jsonMutex); // Released safely once outside the loop
+            xSemaphoreGive(jsonMutex);
           }
 
           for (int i = 0; i < dataCount; i++)
@@ -1704,7 +1747,7 @@ void Task_DataLogger(void *parameter)
           if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
           {
             serializeJson(jsonSend, mqttPayload);
-            xSemaphoreGive(jsonMutex); // Ensure mutex is released
+            xSemaphoreGive(jsonMutex);
           }
 
           Serial.print("[SENDER] Sending via MQTT... ");
@@ -1727,16 +1770,15 @@ void Task_DataLogger(void *parameter)
           }
         }
       }
-      lastSendTime = millis();
     }
 
-    // 3. SD CARD SAVE
+    // 3. SD CARD SAVE FALLBACK (jika server tidak aktif / loggerMode Disabled)
     if (millis() - lastSDSave >= (networkSettings.sdSaveInterval * 60000UL))
     {
       String dataToSave = "";
       if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
       {
-        docSD.clear(); // ✅ REUSE
+        docSD.clear();
         JsonArray arraySD = docSD.to<JsonArray>();
         for (JsonPair kv : jsonSend.as<JsonObject>())
         {
@@ -3845,7 +3887,7 @@ void handleFormSubmit(AsyncWebServerRequest *request)
 void saveToJson(const char *dir, const char *configType)
 {
   // 1. Pastikan ambil Mutex dulu agar tidak bentrok dengan pembacaan sensor
-  if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
+  if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(2000)))
   {
     // Gunakan buffer cukup besar (4KB) untuk menampung JSON config
     DynamicJsonDocument docSave(4096);
@@ -3941,6 +3983,7 @@ void saveToJson(const char *dir, const char *configType)
     // ========================================================
     // WRITE TO FILE (SPIFFS)
     // ========================================================
+    if (!SPIFFS.begin(true)) { xSemaphoreGive(jsonMutex); return; }
     File file = SPIFFS.open(dir, "w");
     if (!file)
     {

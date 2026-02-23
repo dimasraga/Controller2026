@@ -216,15 +216,33 @@ void checkWiFi(int timeout)
     }
   }
 }
+
 void get_JobNum()
 {
-  if (WiFi.status() != WL_CONNECTED)
-    return; // Skip log agar tidak spam
+  bool ethReady = (networkSettings.networkMode == "Ethernet") && (Ethernet.linkStatus() == LinkON);
+  bool wifiReady = (WiFi.status() == WL_CONNECTED);
+  if (!ethReady && !wifiReady)
+    return;
+
+  if (ethReady)
+  {
+    EthernetClient ethClient;
+    ethClient.setTimeout(5000);
+    int result = perform_https_request_mbedtls(
+        ethClient,
+        getDomainFromUrl(networkSettings.erpUrl).c_str(),
+        getPathFromUrl(networkSettings.erpUrl).c_str(),
+        "", networkSettings.erpUsername.c_str(), networkSettings.erpPassword.c_str());
+    if (result == 200)
+    {
+      flagGetJobNum = 0;
+    }
+    return;
+  }
 
   WiFiClientSecure client;
   HTTPClient http;
   client.setInsecure();
-
   http.begin(client, networkSettings.erpUrl.c_str());
   http.setAuthorization(networkSettings.erpUsername.c_str(), networkSettings.erpPassword.c_str());
   http.setTimeout(5000);
@@ -348,7 +366,6 @@ void configNetwork()
                    }
 
                    wifiConnected = false; },
-                   
                  ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
@@ -544,6 +561,8 @@ void configNetwork()
       Serial.printf("  ✓ Starting WiFi STA to: %s\n", networkSettings.ssid.c_str());
       WiFi.setAutoReconnect(true);
       WiFi.persistent(false);
+      // Konfigurasi IP statis khusus untuk interface WiFi STA
+      WiFi.config(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
       WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       wifiConnecting = true;
       wifiConnectStartTime = millis();
@@ -563,13 +582,7 @@ void configNetwork()
     delay(200);
     // Serial.println("  ✓ W5500 reset complete");
 
-    // =====================================================================
-    // STEP 3: Initialize SPI for W5500
-    // =====================================================================
-    // Serial.println("[3/5] Initializing SPI...");
-    // SPI sudah di-init di setup(), tapi pastikan dengan pinout yang benar
-    SPI.begin(ETH_CLK, ETH_MISO, ETH_MOSI, -1); // -1 karena CS manual
-    SPI.setDataMode(SPI_MODE0);
+    Ethernet.init(ETH_CS);
     Serial.printf("  ✓ SPI initialized (CLK:%d, MISO:%d, MOSI:%d, CS:%d)\n",
                   ETH_CLK, ETH_MISO, ETH_MOSI, ETH_CS);
 
@@ -708,6 +721,14 @@ void sendDataMQTT(String dataSend, String publishTopic, int intervalSend)
 {
   if (millis() - sendTime >= (intervalSend * 1000))
   {
+    bool canSendMqtt = (networkSettings.networkMode == "Ethernet")
+                           ? (Ethernet.linkStatus() == LinkON || WiFi.status() == WL_CONNECTED)
+                           : (WiFi.status() == WL_CONNECTED);
+    if (!canSendMqtt)
+    {
+      sendTime = millis();
+      return;
+    }
     if (mqtt.publish(publishTopic.c_str(), dataSend.c_str()))
     {
       Serial.println("MQTT data sent successfully");

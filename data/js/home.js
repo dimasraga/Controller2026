@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // --- D. Update Grafik (HANYA JIKA HIGHCHARTS SUDAH LOAD) ---
-        if (chartT && chartS) {
+        /* if (chartT && chartS) {
           // 1. Atur Visibilitas (Sekali saja saat awal)
           if (firstRun) {
             for (let i = 0; i < enabled_AI.length && i < 4; i++) {
@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           });
           chartS.redraw();
-        } // <--- INI YANG HILANG SEBELUMNYA
+        } // <--- INI YANG HILANG SEBELUMNYA */
       })
       .catch(err => console.error('Data fetch error:', err));
   }
@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
   getSensorData();
   setInterval(getSensorData, 1000);
 
-  loadHighcharts(() => {
+  /* loadHighcharts(() => {
     console.log("Highcharts Loaded!");
 
     chartT = new Highcharts.Chart({
@@ -282,6 +282,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     });
-  });
+  }); */
 
 });
