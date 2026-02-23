@@ -348,6 +348,7 @@ void configNetwork()
                    }
 
                    wifiConnected = false; },
+                   
                  ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
