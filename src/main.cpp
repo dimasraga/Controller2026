@@ -141,45 +141,30 @@ unsigned int readModbus(unsigned int modbusAddress, unsigned int funCode, unsign
 unsigned int crcModbus(unsigned int crc[], byte start, byte sizeArray);
 unsigned int parseByte(unsigned int bytes, bool byteOrder);
 
-// ============================================================================
 // ISR DECLARATIONS
-// ============================================================================
-#define DEBOUNCE_TIME 50
+#define DEBOUNCE_TIME 5
 void IRAM_ATTR isrDI1()
 {
-  // Cek apakah selisih waktu dari trigger terakhir > 50ms
-  if (millis() - digitalInput[1].millisNow >= DEBOUNCE_TIME)
-  {
-    digitalInput[1].millisNow = millis(); // Simpan waktu trigger ini
-    digitalInput[1].flagInt = 1;          // Set flag untuk diproses task
-  }
+  digitalInput[1].millisNow = millis(); // selalu update timestamp
+  digitalInput[1].flagInt = 1;
 }
 
 void IRAM_ATTR isrDI2()
 {
-  if (millis() - digitalInput[2].millisNow >= DEBOUNCE_TIME)
-  {
-    digitalInput[2].millisNow = millis();
-    digitalInput[2].flagInt = 1;
-  }
+  digitalInput[2].millisNow = millis();
+  digitalInput[2].flagInt = 1;
 }
 
 void IRAM_ATTR isrDI3()
 {
-  if (millis() - digitalInput[3].millisNow >= DEBOUNCE_TIME)
-  {
-    digitalInput[3].millisNow = millis();
-    digitalInput[3].flagInt = 1;
-  }
+  digitalInput[3].millisNow = millis();
+  digitalInput[3].flagInt = 1;
 }
 
 void IRAM_ATTR isrDI4()
 {
-  if (millis() - digitalInput[4].millisNow >= DEBOUNCE_TIME)
-  {
-    digitalInput[4].millisNow = millis();
-    digitalInput[4].flagInt = 1;
-  }
+  digitalInput[4].millisNow = millis();
+  digitalInput[4].flagInt = 1;
 }
 
 void (*isrArray[])(void) = {nullptr, isrDI1, isrDI2, isrDI3, isrDI4};
@@ -1319,7 +1304,7 @@ void Task_DataAcquisition(void *parameter)
     // ========================================================================
     // B. BACA DIGITAL
     // ========================================================================
-    if (millis() - lastReadDigital >= 20)
+    if (millis() - lastReadDigital >= 5)
     {
       for (byte i = 1; i < jumlahInputDigital + 1; i++)
       {
