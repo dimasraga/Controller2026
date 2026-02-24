@@ -412,7 +412,7 @@ void configNetwork()
     bool apStarted = WiFi.softAP(
         networkSettings.apSsid.c_str(),     // SSID
         networkSettings.apPassword.c_str(), // Password
-        1,                                  // Channel (fixed ke 6)
+        6,                                  // Channel (fixed ke 6)
         0,                                  // SSID Hidden (0=visible, 1=hidden)
         4                                   // Max connections
     );
@@ -562,7 +562,7 @@ void configNetwork()
       WiFi.setAutoReconnect(true);
       WiFi.persistent(false);
       // Konfigurasi IP statis khusus untuk interface WiFi STA
-      WiFi.config(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+      WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
       WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       wifiConnecting = true;
       wifiConnectStartTime = millis();

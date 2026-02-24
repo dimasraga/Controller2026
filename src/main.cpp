@@ -1926,10 +1926,9 @@ void setup()
   }
 
   // 2. READ CONFIG & INIT BASIC HARDWARE
-  // Read configuration (SPIFFS)
   readConfig();
   // Force Ethernet mode (sesuai request Anda)
-  networkSettings.networkMode = "Ethernet";
+  // networkSettings.networkMode = "Ethernet";
   Serial.println("[FORCE] Mode set to Ethernet");
   printConfigurationDetails();
 
