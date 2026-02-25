@@ -15,7 +15,7 @@
 #include "MbedTLSHandler.hpp"
 bool httpRequestInProgress = false;
 unsigned long httpRequestStartTime = 0;
-const unsigned long HTTP_REQUEST_TIMEOUT = 5000;
+const unsigned long HTTP_REQUEST_TIMEOUT = 6000;
 
 String getDomainFromUrl(String url)
 {
@@ -381,9 +381,7 @@ void configNetwork()
 
     // AP Events
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        Serial.println("[WiFi Event] AP Started!");
-        apReady = true; }, ARDUINO_EVENT_WIFI_AP_START);
+                 { Serial.println("[WiFi Event] AP Started (IP pending...)"); }, ARDUINO_EVENT_WIFI_AP_START);
 
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
@@ -409,19 +407,22 @@ void configNetwork()
     Serial.println("    Max Clients: 4");
     WiFi.softAPConfig(IPAddress(10, 22, 7, 3), IPAddress(10, 22, 7, 1), IPAddress(255, 255, 255, 0)); // Set custom AP IP
     // KUNCI: Gunakan channel yang berbeda dari STA
+    static const uint8_t AP_CHANNEL = 6;
     bool apStarted = WiFi.softAP(
         networkSettings.apSsid.c_str(),     // SSID
         networkSettings.apPassword.c_str(), // Password
-        6,                                  // Channel (fixed ke 6)
+        AP_CHANNEL,                         // Channel (fixed ke 6)
         0,                                  // SSID Hidden (0=visible, 1=hidden)
         4                                   // Max connections
     );
 
     if (apStarted)
     {
-      delay(1000); // PENTING: Tunggu AP fully initialized
-
-      // Verify AP is actually running
+      unsigned long apWait = millis();
+      while (millis() - apWait < 1000)
+      {
+        vTaskDelay(pdMS_TO_TICKS(10));
+      }
       if (WiFi.softAPIP() == IPAddress(0, 0, 0, 0))
       {
         Serial.println("  ✗ AP Failed - IP is 0.0.0.0");
@@ -429,7 +430,7 @@ void configNetwork()
         WiFi.softAPdisconnect(true);
         delay(500);
         apStarted = WiFi.softAP(networkSettings.apSsid.c_str(),
-                                networkSettings.apPassword.c_str(), 6, 0, 4);
+                                networkSettings.apPassword.c_str(), AP_CHANNEL, 0, 4);
         delay(1000);
       }
 
@@ -530,28 +531,24 @@ void configNetwork()
   {
     Serial.println("CONFIGURING ETHERNET (W5500)");
 
-    // Disconnect WiFi completely
-    WiFi.disconnect();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(500);
     WiFi.mode(WIFI_AP_STA);
+    delay(500);
 
     // Start Access Point untuk konfigurasi
     Serial.println("[1/5] Starting Access Point...");
     WiFi.softAPConfig(IPAddress(10, 22, 7, 3), IPAddress(10, 22, 7, 1), IPAddress(255, 255, 255, 0)); // Set custom AP IP
+    static const uint8_t AP_CHANNEL = 6;
     bool apStarted = WiFi.softAP(networkSettings.apSsid.c_str(),
-                                 networkSettings.apPassword.c_str(), 6, 0, 4);
+                                 networkSettings.apPassword.c_str(), AP_CHANNEL, 0, 4);
 
-    if (apStarted)
-    {
-      // delay(1000);
-      apReady = true;
-      startDNSServer();
-      Serial.printf("    AP IP: %s\n", WiFi.softAPIP().toString().c_str());
-    }
-    else
-    {
-      Serial.println("  ✗ Failed to start AP");
-      apReady = false;
-    }
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(500);
+    WiFi.mode(WIFI_AP_STA);
+    delay(500);
     // STA selalu aktif di mode Ethernet, jika ada SSID langsung connect
     esp_wifi_set_mac(WIFI_IF_STA, mac);
     staConnectionAttemptFailed = false;
@@ -562,7 +559,7 @@ void configNetwork()
       WiFi.setAutoReconnect(true);
       WiFi.persistent(false);
       // Konfigurasi IP statis khusus untuk interface WiFi STA
-      WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+      WiFi.config(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
       WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       wifiConnecting = true;
       wifiConnectStartTime = millis();
@@ -743,7 +740,7 @@ void sendDataMQTT(String dataSend, String publishTopic, int intervalSend)
 
 void sendDataHTTP(String data, String serverPath, String httpUsername, String httpPassword, int intervalSend)
 {
-  if (millis() - sendTime < (intervalSend * 1000))
+  if (intervalSend > 0 && millis() - sendTime < (unsigned long)(intervalSend * 1000))
     return;
 
   if (httpRequestInProgress)

@@ -26,6 +26,7 @@
 #include "NetworkFunctions.hpp"
 #include <esp_task_wdt.h>
 #include "SystemMonitor.hpp"
+#include "esp_timer.h"
 
 // Create instance
 SystemMonitor sysMonitor;
@@ -38,11 +39,20 @@ TaskHandle_t Task_Core0_Network = NULL;
 TaskHandle_t Task_Core1_DataAcquisition = NULL;
 TaskHandle_t Task_Core1_ModbusClient = NULL;
 TaskHandle_t Task_Core1_DataLogger = NULL;
-
+TaskHandle_t Task_Core0_HTTPSend = NULL;
 // QUEUE HANDLES untuk komunikasi antar task
+struct HttpSendPacket
+{
+  char data[512];
+  char url[128];
+  char username[64];
+  char password[64];
+};
+
 QueueHandle_t queueSensorData = NULL;
 QueueHandle_t queueModbusData = NULL;
 QueueHandle_t queueLogData = NULL;
+QueueHandle_t queueHttpSend = NULL;
 
 // ============================================================================
 // MUTEX untuk resource sharing
@@ -143,28 +153,46 @@ unsigned int parseByte(unsigned int bytes, bool byteOrder);
 
 // ISR DECLARATIONS
 #define DEBOUNCE_TIME 5
+#define DEBOUNCE_US 5000UL
+
 void IRAM_ATTR isrDI1()
 {
-  digitalInput[1].millisNow = millis(); // selalu update timestamp
-  digitalInput[1].flagInt = 1;
+  uint32_t now = esp_timer_get_time();
+  if (now - digitalInput[1].millisNow >= DEBOUNCE_US)
+  {
+    digitalInput[1].millisNow = now;
+    digitalInput[1].flagInt = 1;
+  }
 }
 
 void IRAM_ATTR isrDI2()
 {
-  digitalInput[2].millisNow = millis();
-  digitalInput[2].flagInt = 1;
+  uint32_t now = esp_timer_get_time();
+  if (now - digitalInput[2].millisNow >= DEBOUNCE_US)
+  {
+    digitalInput[2].millisNow = now;
+    digitalInput[2].flagInt = 1;
+  }
 }
 
 void IRAM_ATTR isrDI3()
 {
-  digitalInput[3].millisNow = millis();
-  digitalInput[3].flagInt = 1;
+  uint32_t now = esp_timer_get_time();
+  if (now - digitalInput[3].millisNow >= DEBOUNCE_US)
+  {
+    digitalInput[3].millisNow = now;
+    digitalInput[3].flagInt = 1;
+  }
 }
 
 void IRAM_ATTR isrDI4()
 {
-  digitalInput[4].millisNow = millis();
-  digitalInput[4].flagInt = 1;
+  uint32_t now = esp_timer_get_time();
+  if (now - digitalInput[4].millisNow >= DEBOUNCE_US)
+  {
+    digitalInput[4].millisNow = now;
+    digitalInput[4].flagInt = 1;
+  }
 }
 
 void (*isrArray[])(void) = {nullptr, isrDI1, isrDI2, isrDI3, isrDI4};
@@ -1165,16 +1193,16 @@ void Task_DataAcquisition(void *parameter)
   unsigned long lastDebugPrint = 0;
   unsigned long lastRunTimeCheck = 0;
 
-  // Variabel Digital (Debounce tetap perlu untuk tombol/digital)
+  // Variabel Digital (filter debouncing untuk tombol/digital)
   static int lastRawState[jumlahInputDigital + 1] = {0};
   static unsigned long lastDebounceTime[jumlahInputDigital + 1] = {0};
   static int stableState[jumlahInputDigital + 1] = {0};
-  const unsigned long debounceDelay = 50;
+  const unsigned long debounceDelay = 1;
   static float prevFilteredValues[jumlahInputAnalog + 1] = {0.0};
-  // 1. SET KECEPATAN ADS MAKSIMAL (Biar hardware tidak delay)
+
   if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)))
   {
-    ads.setDataRate(RATE_ADS1015_3300SPS); // Turbo Mode
+    ads.setDataRate(RATE_ADS1015_3300SPS);
     // ads.setDataRate(RATE_ADS1115_8SPS);
     xSemaphoreGive(i2cMutex);
   }
@@ -1186,7 +1214,7 @@ void Task_DataAcquisition(void *parameter)
     bool useRTU = (networkSettings.protocolMode2.indexOf("RTU") >= 0);
 
     // ========================================================================
-    // A. BACA ANALOG (Loop 100ms)
+    // A. BACA ANALOG
     // ========================================================================
     if (millis() - lastReadAnalog >= 100)
     {
@@ -1354,6 +1382,7 @@ void Task_DataAcquisition(void *parameter)
           if (isRisingEdge)
           {
             digitalInput[i].value++;
+            updateJson("/runtimeData.json", String(i).c_str(), digitalInput[i].value);
           }
         }
         else if (digitalInput[i].taskMode == "Run Time")
@@ -1665,7 +1694,7 @@ void Task_DataLogger(void *parameter)
             additional["jobnum"] = jobNum.c_str();
           }
           nestedObj["StringWaktu"] = getTimeDateNow();
-          nestedObj["Value"] = String(kv.value().as<float>());
+          nestedObj["Value"] = kv.value().as<String>().toFloat();
         }
         serializeJson(docSD, dataToSave);
         xSemaphoreGive(jsonMutex);
@@ -1730,13 +1759,13 @@ void Task_DataLogger(void *parameter)
             sendString = "";
             serializeJson(docNew, sendString);
 
-            if (xSemaphoreTake(spiMutex, pdMS_TO_TICKS(2000)))
-            {
-              sendDataHTTP(sendString, networkSettings.endpoint, networkSettings.mqttUsername, networkSettings.mqttPassword, 0);
-              xSemaphoreGive(spiMutex);
-            }
-            else
-              Serial.println("❌ SKIP (SPI Busy)");
+            // Send data to HTTP queue instead of blocking the task
+            HttpSendPacket pkt;
+            strlcpy(pkt.data, sendString.c_str(), sizeof(pkt.data));
+            strlcpy(pkt.url, networkSettings.endpoint.c_str(), sizeof(pkt.url));
+            strlcpy(pkt.username, networkSettings.mqttUsername.c_str(), sizeof(pkt.username));
+            strlcpy(pkt.password, networkSettings.mqttPassword.c_str(), sizeof(pkt.password));
+            xQueueSend(queueHttpSend, &pkt, portMAX_DELAY);
 
             vTaskDelay(pdMS_TO_TICKS(300));
           }
@@ -1792,7 +1821,7 @@ void Task_DataLogger(void *parameter)
             additional["jobnum"] = jobNum.c_str();
           }
           nestedObj["StringWaktu"] = getTimeDateNow();
-          nestedObj["Value"] = String(kv.value().as<float>());
+          nestedObj["Value"] = kv.value().as<String>().toFloat();
         }
         serializeJson(docSD, dataToSave);
         xSemaphoreGive(jsonMutex);
@@ -1841,6 +1870,28 @@ void Task_DataLogger(void *parameter)
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+void taskHTTPSend(void *pvParameters)
+{
+  HttpSendPacket pkt;
+  esp_task_wdt_add(NULL);
+  for (;;)
+  {
+    if (xQueueReceive(queueHttpSend, &pkt, portMAX_DELAY) == pdTRUE)
+    {
+      if (xSemaphoreTake(spiMutex, pdMS_TO_TICKS(2000)))
+      {
+        sendDataHTTP(String(pkt.data), String(pkt.url), String(pkt.username), String(pkt.password), 0);
+        xSemaphoreGive(spiMutex);
+      }
+      else
+      {
+        Serial.println("❌ SKIP HTTP Task (SPI Busy)");
+      }
+    }
+    esp_task_wdt_reset();
   }
 }
 
@@ -1917,8 +1968,9 @@ void setup()
   queueSensorData = xQueueCreate(10, sizeof(SensorDataPacket));
   queueModbusData = xQueueCreate(10, sizeof(ModbusDataPacket));
   queueLogData = xQueueCreate(10, sizeof(LogDataPacket));
+  queueHttpSend = xQueueCreate(10, sizeof(HttpSendPacket));
 
-  if (!spiMutex || !jsonMutex || !queueSensorData || !modbusMutex)
+  if (!spiMutex || !jsonMutex || !queueSensorData || !modbusMutex || !queueHttpSend)
   {
     Serial.println("❌ Critical Error: Failed to create Mutex/Queue!");
     while (1)
@@ -1926,9 +1978,10 @@ void setup()
   }
 
   // 2. READ CONFIG & INIT BASIC HARDWARE
+  // Read configuration (SPIFFS)
   readConfig();
   // Force Ethernet mode (sesuai request Anda)
-  // networkSettings.networkMode = "Ethernet";
+  networkSettings.networkMode = "Ethernet";
   Serial.println("[FORCE] Mode set to Ethernet");
   printConfigurationDetails();
 
@@ -2050,6 +2103,7 @@ void setup()
   xTaskCreatePinnedToCore(Task_DataAcquisition, "DataAcqTask", 8192, NULL, 4, &Task_Core1_DataAcquisition, 1);
   xTaskCreatePinnedToCore(Task_ModbusClient, "ModbusTask", 8192, NULL, 3, &Task_Core1_ModbusClient, 1);
   xTaskCreatePinnedToCore(Task_DataLogger, "LoggerTask", 32768, NULL, 1, &Task_Core1_DataLogger, 0);
+  xTaskCreatePinnedToCore(taskHTTPSend, "HTTPSendTask", 8192, NULL, 2, &Task_Core0_HTTPSend, 0);
 }
 
 void loop()
@@ -2469,8 +2523,6 @@ void setupWebServer()
     String response;
     serializeJson(statusDoc, response);
     request->send(200, "application/json", response); });
-  // LETAKKAN TEPAT SETELAH ENDPOINT /wifiStatus (baris 353)
-  // SEBELUM bagian "Check connected interface" (baris 372)
 
   // =========================================================================
   // ENDPOINT BARU: Ethernet Status and Diagnostic
@@ -2574,10 +2626,6 @@ void setupWebServer()
   String response;
   serializeJson(statusDoc, response);
   request->send(200, "application/json", response); });
-
-  // =========================================================================
-  // ENDPOINT BARU: Network Interface Information (kombinasi WiFi + Ethernet)
-  // =========================================================================
   server.on("/networkInfo", HTTP_GET, [](AsyncWebServerRequest *request)
             {
   DynamicJsonDocument infoDoc(768);
@@ -2678,9 +2726,6 @@ void setupWebServer()
   serializeJson(testDoc, response);
   request->send(allTestsPassed ? 200 : 500, "application/json", response); });
 
-  // =========================================================================
-  // AKHIR ENDPOINT ETHERNET - LANJUT KE "Check connected interface"
-  // =========================================================================
   // Check connected interface
   tcpip_adapter_ip_info_t ipInfo;
   if (tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ipInfo) == ESP_OK)
@@ -2699,19 +2744,13 @@ void setupWebServer()
   {
     ESP_LOGW("Ethernet", "Ethernet interface not initialized or no IP assigned.");
   }
-
-  // 1. Cache Folder CSS & JS (Disimpan browser selama 1 tahun)
   server.serveStatic("/css", SPIFFS, "/css").setCacheControl("max-age=31536000");
   server.serveStatic("/js", SPIFFS, "/js").setCacheControl("max-age=31536000");
-
-  // 2. Cache File Libraries & Gambar Satuan (Disimpan browser selama 1 tahun)
   server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css").setCacheControl("max-age=31536000");
   server.serveStatic("/bootstrap.bundle.min.js", SPIFFS, "/bootstrap.bundle.min.js").setCacheControl("max-age=31536000");
   server.serveStatic("/jquery-3.5.1.min.js", SPIFFS, "/jquery-3.5.1.min.js").setCacheControl("max-age=31536000");
   server.serveStatic("/logoMeditech32.png", SPIFFS, "/logoMeditech32.png").setCacheControl("max-age=31536000");
   server.serveStatic("/logoMeditech256.png", SPIFFS, "/logoMeditech256.png").setCacheControl("max-age=31536000");
-
-  // 3. Halaman HTML Utama (JANGAN di-cache, agar data selalu update)
   server.serveStatic("/", SPIFFS, "/").setDefaultFile("home.html").setCacheControl("no-cache");
   server.begin();
   if (networkSettings.networkMode == "Ethernet")
@@ -2725,9 +2764,6 @@ void setupWebServer()
   Serial.println("DNS Server started, redirecting all domains to " + WiFi.softAPIP().toString());
 }
 
-// ============================================================================
-// SETUP INTERRUPTS
-// ============================================================================
 void setupInterrupts()
 {
   for (byte i = 1; i <= jumlahInputDigital; i++)
@@ -3443,12 +3479,12 @@ void readConfig()
         if (!error)
         {
           for (int i = 1; i < jumlahInputDigital + 1; i++)
-          {
-            if (digitalInput[i].taskMode == "Run Time")
-            {
-              digitalInput[i].value = doc[String(i)];
-            }
-          }
+{
+  if (digitalInput[i].taskMode == "Run Time" || digitalInput[i].taskMode == "Counting")
+  {
+    digitalInput[i].value = doc[String(i)];
+  }
+}
         }
       }
     }
@@ -3982,7 +4018,11 @@ void saveToJson(const char *dir, const char *configType)
     // ========================================================
     // WRITE TO FILE (SPIFFS)
     // ========================================================
-    if (!SPIFFS.begin(true)) { xSemaphoreGive(jsonMutex); return; }
+    if (!SPIFFS.begin(true))
+    {
+      xSemaphoreGive(jsonMutex);
+      return;
+    }
     File file = SPIFFS.open(dir, "w");
     if (!file)
     {

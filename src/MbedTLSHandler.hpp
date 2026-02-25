@@ -10,9 +10,9 @@
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
 #include "mbedtls/base64.h"
-#define TLS_HANDSHAKE_TIMEOUT 8000U
-#define TLS_READ_TIMEOUT 4000U
-#define TLS_WRITE_TIMEOUT 8000U
+#define TLS_HANDSHAKE_TIMEOUT 5000U
+#define TLS_READ_TIMEOUT 3000U
+#define TLS_WRITE_TIMEOUT 5000U
 #define TLS_RECV_WAIT_MS 2U
 #define TCP_CONNECT_RETRIES 1
 #define SSL_BUFFER_SIZE 1024U
