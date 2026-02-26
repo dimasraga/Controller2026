@@ -650,12 +650,6 @@ void handleEthernetClient()
           xSemaphoreGive(jsonMutex);
         }
         payload += "]";
-
-        // 2. Send Payload
-        // Debugging: Print to Serial to verify data
-        // Serial.print("[Eth] Sending: "); Serial.println(payload);
-
-        // CRITICAL FIX: Do NOT send "HTTP/1.1 200 OK" here. It was already sent above.
         client.print(payload);
       }
 
