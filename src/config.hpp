@@ -86,7 +86,7 @@ struct DigitalInput
   float value;
   int sumValue = 0;
   unsigned long millis_1;
-  volatile uint32_t millisNow;
+  unsigned long millisNow;
   bool flagInt;
   unsigned long intervalTime, lastMillisPulseMode;
   float conversionFactor;

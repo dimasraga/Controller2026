@@ -26,7 +26,6 @@
 #include "NetworkFunctions.hpp"
 #include <esp_task_wdt.h>
 #include "SystemMonitor.hpp"
-#include "esp_timer.h"
 
 // Create instance
 SystemMonitor sysMonitor;
@@ -153,46 +152,28 @@ unsigned int parseByte(unsigned int bytes, bool byteOrder);
 
 // ISR DECLARATIONS
 #define DEBOUNCE_TIME 5
-#define DEBOUNCE_US 5000UL
-
 void IRAM_ATTR isrDI1()
 {
-  uint32_t now = esp_timer_get_time();
-  if (now - digitalInput[1].millisNow >= DEBOUNCE_US)
-  {
-    digitalInput[1].millisNow = now;
-    digitalInput[1].flagInt = 1;
-  }
+  digitalInput[1].millisNow = millis(); // selalu update timestamp
+  digitalInput[1].flagInt = 1;
 }
 
 void IRAM_ATTR isrDI2()
 {
-  uint32_t now = esp_timer_get_time();
-  if (now - digitalInput[2].millisNow >= DEBOUNCE_US)
-  {
-    digitalInput[2].millisNow = now;
-    digitalInput[2].flagInt = 1;
-  }
+  digitalInput[2].millisNow = millis();
+  digitalInput[2].flagInt = 1;
 }
 
 void IRAM_ATTR isrDI3()
 {
-  uint32_t now = esp_timer_get_time();
-  if (now - digitalInput[3].millisNow >= DEBOUNCE_US)
-  {
-    digitalInput[3].millisNow = now;
-    digitalInput[3].flagInt = 1;
-  }
+  digitalInput[3].millisNow = millis();
+  digitalInput[3].flagInt = 1;
 }
 
 void IRAM_ATTR isrDI4()
 {
-  uint32_t now = esp_timer_get_time();
-  if (now - digitalInput[4].millisNow >= DEBOUNCE_US)
-  {
-    digitalInput[4].millisNow = now;
-    digitalInput[4].flagInt = 1;
-  }
+  digitalInput[4].millisNow = millis();
+  digitalInput[4].flagInt = 1;
 }
 
 void (*isrArray[])(void) = {nullptr, isrDI1, isrDI2, isrDI3, isrDI4};
@@ -1199,7 +1180,7 @@ void Task_DataAcquisition(void *parameter)
   static int stableState[jumlahInputDigital + 1] = {0};
   const unsigned long debounceDelay = 1;
   static float prevFilteredValues[jumlahInputAnalog + 1] = {0.0};
-
+  
   if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)))
   {
     ads.setDataRate(RATE_ADS1015_3300SPS);
@@ -1214,7 +1195,7 @@ void Task_DataAcquisition(void *parameter)
     bool useRTU = (networkSettings.protocolMode2.indexOf("RTU") >= 0);
 
     // ========================================================================
-    // A. BACA ANALOG
+    // A. BACA ANALOG 
     // ========================================================================
     if (millis() - lastReadAnalog >= 100)
     {
@@ -1382,7 +1363,6 @@ void Task_DataAcquisition(void *parameter)
           if (isRisingEdge)
           {
             digitalInput[i].value++;
-            updateJson("/runtimeData.json", String(i).c_str(), digitalInput[i].value);
           }
         }
         else if (digitalInput[i].taskMode == "Run Time")
@@ -1694,7 +1674,7 @@ void Task_DataLogger(void *parameter)
             additional["jobnum"] = jobNum.c_str();
           }
           nestedObj["StringWaktu"] = getTimeDateNow();
-          nestedObj["Value"] = kv.value().as<String>().toFloat();
+          nestedObj["Value"] = String(kv.value().as<float>());
         }
         serializeJson(docSD, dataToSave);
         xSemaphoreGive(jsonMutex);
@@ -1821,7 +1801,7 @@ void Task_DataLogger(void *parameter)
             additional["jobnum"] = jobNum.c_str();
           }
           nestedObj["StringWaktu"] = getTimeDateNow();
-          nestedObj["Value"] = kv.value().as<String>().toFloat();
+          nestedObj["Value"] = String(kv.value().as<float>());
         }
         serializeJson(docSD, dataToSave);
         xSemaphoreGive(jsonMutex);
@@ -3479,12 +3459,12 @@ void readConfig()
         if (!error)
         {
           for (int i = 1; i < jumlahInputDigital + 1; i++)
-{
-  if (digitalInput[i].taskMode == "Run Time" || digitalInput[i].taskMode == "Counting")
-  {
-    digitalInput[i].value = doc[String(i)];
-  }
-}
+          {
+            if (digitalInput[i].taskMode == "Run Time")
+            {
+              digitalInput[i].value = doc[String(i)];
+            }
+          }
         }
       }
     }
