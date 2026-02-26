@@ -640,7 +640,10 @@ void handleEthernetClient()
 
               if (!first)
                 payload += ",";
-              payload += "{\"KodeSensor\":\"" + key + "\",\"Value\":\"" + kv.value().as<String>() + "\"}";
+              String val = kv.value().as<String>();
+              if (val == "null" || val == "" || val == "undefined")
+                val = "0";
+              payload += "{\"KodeSensor\":\"" + key + "\",\"Value\":\"" + val + "\"}";
               first = false;
             }
           }
@@ -1180,7 +1183,7 @@ void Task_DataAcquisition(void *parameter)
   static int stableState[jumlahInputDigital + 1] = {0};
   const unsigned long debounceDelay = 1;
   static float prevFilteredValues[jumlahInputAnalog + 1] = {0.0};
-  
+
   if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)))
   {
     ads.setDataRate(RATE_ADS1015_3300SPS);
@@ -1195,7 +1198,7 @@ void Task_DataAcquisition(void *parameter)
     bool useRTU = (networkSettings.protocolMode2.indexOf("RTU") >= 0);
 
     // ========================================================================
-    // A. BACA ANALOG 
+    // A. BACA ANALOG
     // ========================================================================
     if (millis() - lastReadAnalog >= 100)
     {
@@ -1508,9 +1511,10 @@ void Task_ModbusClient(void *parameter)
       // 1. Ambil Jumlah Sensor
       if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(500)))
       {
-        deserializeJson(jsonParam, stringParam);
+        if (!jsonParam.containsKey("nameData") && stringParam.length() > 5)
+          deserializeJson(jsonParam, stringParam);
         JsonArray nameData = jsonParam["nameData"];
-        totalParamsToRead = nameData.size();
+        totalParamsToRead = nameData.isNull() ? 0 : nameData.size();
         xSemaphoreGive(jsonMutex);
       }
 
@@ -1579,6 +1583,8 @@ void Task_ModbusClient(void *parameter)
               // Jika timeout, opsional: jangan update atau update 0
               if (readSuccess)
                 jsonSend[currentParamName] = String(finalValue, 2);
+              else if (!jsonSend.containsKey(currentParamName))
+                jsonSend[currentParamName] = String(0.0f, 2); // inisialisasi default
             }
             xSemaphoreGive(jsonMutex);
           }
