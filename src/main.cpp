@@ -1597,6 +1597,7 @@ void Task_DataLogger(void *parameter)
   unsigned long lastSDSave = 0;
   unsigned long lastPrint = 0;
   unsigned long lastWatchdogFeed = 0;
+  bool lastSendFailed = false;
   DynamicJsonDocument docNew(2048);
   DynamicJsonDocument docSD(1024);
 
@@ -1608,25 +1609,25 @@ void Task_DataLogger(void *parameter)
       lastWatchdogFeed = millis();
     }
 
-xQueueReceive(queueSensorData, &sensorData, 0);
-if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
-{
-  for (byte i = 1; i < jumlahInputAnalog + 1; i++)
-  {
-    if (analogInput[i].name != "")
+    xQueueReceive(queueSensorData, &sensorData, 0);
+    if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
     {
-      jsonSend[analogInput[i].name] = analogInput[i].mapValue; 
+      for (byte i = 1; i < jumlahInputAnalog + 1; i++)
+      {
+        if (analogInput[i].name != "")
+        {
+          jsonSend[analogInput[i].name] = analogInput[i].mapValue;
+        }
+      }
+      for (byte i = 1; i < jumlahInputDigital + 1; i++)
+      {
+        if (digitalInput[i].name != "")
+        {
+          jsonSend[digitalInput[i].name] = digitalInput[i].value;
+        }
+      }
+      xSemaphoreGive(jsonMutex);
     }
-  }
-  for (byte i = 1; i < jumlahInputDigital + 1; i++)
-  {
-    if (digitalInput[i].name != "")
-    {
-      jsonSend[digitalInput[i].name] = digitalInput[i].value;
-    }
-  }
-  xSemaphoreGive(jsonMutex);
-}
     if (xQueueReceive(queueModbusData, &modbusData, 0) == pdTRUE)
     {
       if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(100)))
@@ -1716,7 +1717,6 @@ if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
             char valBuf[20];
             dtostrf(dataList[i].value, 1, 2, valBuf);
             docNew["value"] = serialized(String(valBuf));
-
             sendString = "";
             serializeJson(docNew, sendString);
             HttpSendPacket pkt;
@@ -1725,7 +1725,6 @@ if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
             strlcpy(pkt.username, networkSettings.mqttUsername.c_str(), sizeof(pkt.username));
             strlcpy(pkt.password, networkSettings.mqttPassword.c_str(), sizeof(pkt.password));
             xQueueSend(queueHttpSend, &pkt, portMAX_DELAY);
-
             vTaskDelay(pdMS_TO_TICKS(300));
           }
         }
@@ -1737,7 +1736,6 @@ if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
             serializeJson(jsonSend, mqttPayload);
             xSemaphoreGive(jsonMutex);
           }
-
           Serial.print("[SENDER] Sending via MQTT... ");
           if (mqtt.connected() && networkSettings.pubTopic.length() > 0)
           {
@@ -1760,7 +1758,7 @@ if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
       }
     }
 
-    // 3. SD CARD SAVE FALLBACK (jika server tidak aktif / loggerMode Disabled)
+    // 3. SD CARD SAVE FALLBACK 
     if (millis() - lastSDSave >= (networkSettings.sdSaveInterval * 60000UL))
     {
       String dataToSave = "";

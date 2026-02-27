@@ -108,61 +108,32 @@ IpAddressSplit parsingIP(String data)
 
 void mqttCallback(char *topic, byte *payload, unsigned int length)
 {
-  Serial.println("MQTT Message Received");
-  String command(reinterpret_cast<const char *>(payload), length); // construct sekali, tanpa loop
-  Serial.println(command);
-
+  String command(reinterpret_cast<const char *>(payload), length);
   StaticJsonDocument<200> commandJson;
-  DeserializationError error = deserializeJson(commandJson, command);
-  if (error)
-  {
-    Serial.println("Failed to parse JSON");
+  if (deserializeJson(commandJson, command))
     return;
-  }
 
   for (byte i = 1; i < jumlahOutputDigital + 1; i++)
-  {
     if (commandJson.containsKey(digitalOutput[i].name))
-    {
-      Serial.print(digitalOutput[i].name + ": ");
-      bool statusDO = commandJson[digitalOutput[i].name];
-      Serial.println(statusDO);
-      digitalWrite(2, commandJson[digitalOutput[i].name]);
-    }
-  }
+      digitalWrite(2, commandJson[digitalOutput[i].name].as<bool>());
 }
 
-// =================================================================
-// PERUBAHAN 3: Modifikasi checkWiFi() secara keseluruhan
-// =================================================================
 void checkWiFi(int timeout)
 {
   if (networkSettings.networkMode == "WiFi" || (networkSettings.networkMode == "Ethernet" && networkSettings.ssid.length() > 1))
   {
-    // if (staConnectionAttemptFailed && networkSettings.networkMode == "WiFi")
-    // {
-    //   return;
-    // }
-
-    // Update MAC jika belum ada
     if (networkSettings.macAddress.length() < 10)
       networkSettings.macAddress = WiFi.macAddress();
-
     if (millis() - checkTime >= timeout)
     {
       wl_status_t status = WiFi.status();
-
-      // Handle WiFi disconnection
       if (status != WL_CONNECTED && !wifiConnecting)
       {
-        // Hanya trigger error blinker jika ini mode UTAMA
         if (networkSettings.networkMode == "WiFi")
           errorBlinker.trigger(5, 500);
-
         Serial.println("[WiFi Check] Status: " + String(status) + " (Disconnected). Reconnecting...");
         wifiConnecting = true;
         wifiConnectStartTime = millis();
-
         WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
       }
 
@@ -172,22 +143,13 @@ void checkWiFi(int timeout)
         wifiConnecting = false;
         WiFi.disconnect(true);
         delay(500);
-        // Reset di semua mode agar bisa retry otomatis
         staConnectionAttemptFailed = false;
       }
-      // Handle successful connection
       if (status == WL_CONNECTED)
       {
         if (!wifiConnected || wifiConnecting)
         {
-          Serial.println("=================================");
-          Serial.println("✅ WiFi Connected (Background/Primary)");
-          Serial.print("   IP: ");
-          Serial.println(WiFi.localIP());
-          Serial.print("   RSSI: ");
-          Serial.println(WiFi.RSSI());
-          Serial.println("=================================");
-
+          Serial.printf("[WiFi] Connected | IP: %s | RSSI: %d\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
           wifiConnected = true;
           wifiConnecting = false;
           staConnectionAttemptFailed = false;
@@ -208,8 +170,6 @@ void checkWiFi(int timeout)
       }
       checkTime = millis();
     }
-
-    // Monitor AP Status (Tetap jalan)
     if (apReady && millis() % 30000 < 100)
     {
       Serial.printf("[AP Status] Clients: %d | IP: %s\n", WiFi.softAPgetStationNum(), WiFi.softAPIP().toString().c_str());
@@ -251,8 +211,6 @@ void get_JobNum()
 
   if (httpResponseCode > 0)
   {
-    // Menggunakan buffer Stream langsung tanpa String penampung besar
-    // Alokasi 512 bytes di stack lebih cepat dan aman daripada 2048 bytes di heap
     StaticJsonDocument<512> doc;
     DeserializationError error = deserializeJson(doc, http.getStream());
 
@@ -278,11 +236,10 @@ void startDNSServer()
 {
   if (!dnsStarted && apReady)
   {
-    delay(500); // Tunggu AP fully ready
+    delay(500);
     dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
     dnsStarted = true;
-    ESP_LOGI("DNS", "DNS server started, redirecting to %s", WiFi.softAPIP().toString().c_str());
-    Serial.println("DNS Server started on " + WiFi.softAPIP().toString());
+    ESP_LOGI("DNS", "DNS started: %s", WiFi.softAPIP().toString().c_str());
   }
 }
 
@@ -300,113 +257,21 @@ void configNetwork()
 {
   if (networkSettings.networkMode == "WiFi")
   {
-    Serial.println("CONFIGURING WIFI (AP+STA MODE)");
-
-    // =====================================================================
-    // STEP 1: Complete WiFi Reset
-    // =====================================================================
-    Serial.println("[1/7] Resetting WiFi...");
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     delay(500);
-
-    // MAC harus di-set setelah mode WIFI_STA/AP_STA aktif, bukan saat WIFI_OFF
-    Serial.println("[2/7] Setting WiFi mode to AP+STA...");
     WiFi.mode(WIFI_AP_STA);
     delay(500);
-
-    Serial.println("[3/7] Setting MAC Address...");
     esp_err_t err = esp_wifi_set_mac(WIFI_IF_STA, mac);
-    if (err == ESP_OK)
-    {
-      Serial.printf("  ✓ MAC Address set: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    }
-    else
-    {
-      Serial.println("  ✗ Failed to set MAC Address");
-    }
+    ESP_LOGI("WiFi", "Init AP+STA | MAC set: %s", err == ESP_OK ? "OK" : "FAIL");
     delay(200);
-    // =====================================================================
-    // STEP 4: Setup WiFi Events
-    // =====================================================================
-    Serial.println("[4/7] Setting up WiFi events...");
-
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 { Serial.println("[WiFi Event] STA Started"); }, ARDUINO_EVENT_WIFI_STA_START);
-
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        Serial.println("[WiFi Event] STA Connected to AP!");
-        wifiConnecting = false;
-        wifiConnected = true; }, ARDUINO_EVENT_WIFI_STA_CONNECTED);
-
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-                   Serial.print("[WiFi Event] STA Disconnected. Reason: ");
-                   Serial.println(info.wifi_sta_disconnected.reason);
-
-                   switch (info.wifi_sta_disconnected.reason)
-                   {
-                   case WIFI_REASON_AUTH_EXPIRE:
-                   case WIFI_REASON_AUTH_FAIL:
-                     Serial.println("  → Authentication failed (wrong password?)");
-                     break;
-                   case WIFI_REASON_NO_AP_FOUND:
-                     Serial.println("  → AP not found (wrong SSID?)");
-                     break;
-                   case WIFI_REASON_ASSOC_FAIL:
-                     Serial.println("  → Association failed");
-                     break;
-                   case WIFI_REASON_HANDSHAKE_TIMEOUT:
-                     Serial.println("  → 4-way handshake timeout");
-                     break;
-                   default:
-                     Serial.printf("  → Error code: %d\n", info.wifi_sta_disconnected.reason);
-                   }
-
-                   wifiConnected = false; },
-                 ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        Serial.print("[WiFi Event] STA Got IP: ");
-        Serial.println(WiFi.localIP());
-        Serial.print("  → Subnet: ");
-        Serial.println(WiFi.subnetMask());
-        Serial.print("  → Gateway: ");
-        Serial.println(WiFi.gatewayIP());
-        Serial.print("  → DNS: ");
-        Serial.println(WiFi.dnsIP()); }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-
-    // AP Events
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 { Serial.println("[WiFi Event] AP Started (IP pending...)"); }, ARDUINO_EVENT_WIFI_AP_START);
-
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        Serial.println("[WiFi Event] Client Connected to AP");
-        Serial.printf("  Clients: %d\n", WiFi.softAPgetStationNum()); }, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
-
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        Serial.println("[WiFi Event] Client Disconnected from AP");
-        Serial.printf("  Clients: %d\n", WiFi.softAPgetStationNum()); }, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
-
-    Serial.println("  ✓ Events configured");
-
-    // =====================================================================
-    // STEP 5: Configure Access Point (AP) - PRIORITAS PERTAMA!
-    // =====================================================================
-    Serial.println("[5/7] Starting Access Point...");
-    Serial.println("  AP Configuration:");
-    Serial.printf("    SSID: %s\n", networkSettings.apSsid.c_str());
-    Serial.printf("    Pass: %s\n", networkSettings.apPassword.c_str());
-    Serial.println("    Channel: 6 (fixed, tidak bentrok)");
-    Serial.println("    Hidden: No");
-    Serial.println("    Max Clients: 4");
+    WiFi.onEvent([](WiFiEvent_t e, WiFiEventInfo_t i)
+                 { wifiConnecting = false; wifiConnected = true; }, ARDUINO_EVENT_WIFI_STA_CONNECTED);
+    WiFi.onEvent([](WiFiEvent_t e, WiFiEventInfo_t i)
+                 { wifiConnected = false; }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    WiFi.onEvent([](WiFiEvent_t e, WiFiEventInfo_t i)
+                 { ESP_LOGI("WiFi", "IP:%s", WiFi.localIP().toString().c_str()); }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
     WiFi.softAPConfig(IPAddress(10, 22, 7, 3), IPAddress(10, 22, 7, 1), IPAddress(255, 255, 255, 0)); // Set custom AP IP
-    // KUNCI: Gunakan channel yang berbeda dari STA
     static const uint8_t AP_CHANNEL = 6;
     bool apStarted = WiFi.softAP(
         networkSettings.apSsid.c_str(),     // SSID
@@ -415,7 +280,6 @@ void configNetwork()
         0,                                  // SSID Hidden (0=visible, 1=hidden)
         4                                   // Max connections
     );
-
     if (apStarted)
     {
       unsigned long apWait = millis();
@@ -433,15 +297,12 @@ void configNetwork()
                                 networkSettings.apPassword.c_str(), AP_CHANNEL, 0, 4);
         delay(1000);
       }
-
       if (WiFi.softAPIP() != IPAddress(0, 0, 0, 0))
       {
         apReady = true;
         Serial.println("  ✓ AP Started Successfully!");
         Serial.printf("    AP IP: %s\n", WiFi.softAPIP().toString().c_str());
         Serial.printf("    AP MAC: %s\n", WiFi.softAPmacAddress().c_str());
-
-        // Start DNS Server setelah AP fully ready
         startDNSServer();
       }
       else
@@ -455,12 +316,8 @@ void configNetwork()
       Serial.println("  ✗ Failed to start AP");
       apReady = false;
     }
-
-    // =====================================================================
     // STEP 6: Configure Station (STA) IP Settings
-    // =====================================================================
     Serial.println("[6/7] Configuring STA IP settings...");
-
     if (networkSettings.dhcpMode == "DHCP")
     {
       Serial.println("  Using DHCP");
@@ -470,19 +327,14 @@ void configNetwork()
     {
       Serial.println("  Using Static IP");
       IpAddressSplit hasilParsing;
-
       hasilParsing = parsingIP(networkSettings.ipAddress);
       IPAddress localIP(hasilParsing.ip[0], hasilParsing.ip[1], hasilParsing.ip[2], hasilParsing.ip[3]);
-
       hasilParsing = parsingIP(networkSettings.subnetMask);
       IPAddress subnetIP(hasilParsing.ip[0], hasilParsing.ip[1], hasilParsing.ip[2], hasilParsing.ip[3]);
-
       hasilParsing = parsingIP(networkSettings.ipGateway);
       IPAddress gatewayIP(hasilParsing.ip[0], hasilParsing.ip[1], hasilParsing.ip[2], hasilParsing.ip[3]);
-
       hasilParsing = parsingIP(networkSettings.ipDNS);
       IPAddress dnsIP(hasilParsing.ip[0], hasilParsing.ip[1], hasilParsing.ip[2], hasilParsing.ip[3]);
-
       if (WiFi.config(localIP, gatewayIP, subnetIP, dnsIP))
       {
         Serial.println("  ✓ Static IP configured");
@@ -513,18 +365,9 @@ void configNetwork()
     WiFi.begin(networkSettings.ssid.c_str(), networkSettings.password.c_str());
 
     networkSettings.macAddress = WiFi.macAddress();
-
-    Serial.println("\n=================================");
-    Serial.println("CONFIGURATION COMPLETE");
-    Serial.println("=================================");
-    Serial.println("AP Status:");
-    Serial.printf("  SSID: %s\n", networkSettings.apSsid.c_str());
-    Serial.printf("  IP: %s\n", WiFi.softAPIP().toString().c_str());
-    Serial.printf("  Ready: %s\n", apReady ? "YES" : "NO");
-    Serial.println("\nSTA Status:");
-    Serial.printf("  Target: %s\n", networkSettings.ssid.c_str());
-    Serial.println("  Status: Connecting...");
-    Serial.println("=================================\n");
+    Serial.printf("[WiFi] AP:%s(%s) ready=%d | STA->%s connecting\n",
+                  networkSettings.apSsid.c_str(), WiFi.softAPIP().toString().c_str(),
+                  apReady, networkSettings.ssid.c_str());
   }
 
   if (networkSettings.networkMode == "Ethernet")
@@ -676,32 +519,14 @@ void configNetwork()
     }
 
     // Set MAC Address string
-    networkSettings.macAddress = "";
-    for (int i = 0; i < 6; i++)
-    {
-      if (mac[i] < 0x10)
-        networkSettings.macAddress += "0";
-      networkSettings.macAddress += String(mac[i], HEX);
-      if (i < 5)
-        networkSettings.macAddress += ":";
-    }
-
-    // Print final Ethernet status
-    Serial.println("\n=================================");
-    Serial.println("ETHERNET CONFIGURATION COMPLETE");
-    Serial.println("=================================");
-    Serial.printf("MAC Address: %s\n", networkSettings.macAddress.c_str());
-    Serial.printf("IP Address:  %s\n", Ethernet.localIP().toString().c_str());
-    Serial.printf("Subnet Mask: %s\n", Ethernet.subnetMask().toString().c_str());
-    Serial.printf("Gateway:     %s\n", Ethernet.gatewayIP().toString().c_str());
-    Serial.printf("DNS Server:  %s\n", Ethernet.dnsServerIP().toString().c_str());
-    Serial.printf("Link Status: %s\n",
-                  Ethernet.linkStatus() == LinkON ? "CONNECTED" : "DISCONNECTED");
-    Serial.println("=================================\n");
+    char macStr[18];
+    sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    networkSettings.macAddress = macStr;
     ethServer.begin();
-    Serial.println("[INFO] AsyncWebServer will handle Ethernet requests");
-    Serial.printf("  Access via Ethernet: http://%s\n", Ethernet.localIP().toString().c_str());
-    Serial.printf("  Access via WiFi AP:  http://%s\n", WiFi.softAPIP().toString().c_str());
+    Serial.printf("[ETH] Done | MAC:%s IP:%s Link:%s\n  ETH:http://%s AP:http://%s\n",
+                  networkSettings.macAddress.c_str(), Ethernet.localIP().toString().c_str(),
+                  Ethernet.linkStatus() == LinkON ? "UP" : "DOWN",
+                  Ethernet.localIP().toString().c_str(), WiFi.softAPIP().toString().c_str());
   }
 }
 
@@ -857,14 +682,38 @@ void saveToSD(String data)
   dataOffline.close();
   ESP_LOGI("SD Card", "✓ Data saved");
 }
-
+// Helper untuk mengirim chunk data backup ke server
+static bool sendBackupChunk(const String &payload)
+{
+  if (networkSettings.networkMode == "Ethernet" && Ethernet.linkStatus() == LinkON)
+  {
+    EthernetClient ethClient;
+    ethClient.setTimeout(5000);
+    String serverPath = "https://api-logger-dev2.medionindonesia.com/api/v1/UpdateLoggingRealtime";
+    int result = perform_https_request_mbedtls(ethClient, getDomainFromUrl(serverPath).c_str(), getPathFromUrl(serverPath).c_str(), payload.c_str(), networkSettings.mqttUsername.c_str(), networkSettings.mqttPassword.c_str());
+    return (result == 200 || result == 0);
+  }
+  else if (WiFi.status() == WL_CONNECTED)
+  {
+    WiFiClientSecure client;
+    HTTPClient https;
+    client.setInsecure();
+    if (https.begin(client, "https://api-logger-dev2.medionindonesia.com/api/v1/UpdateLoggingRealtime"))
+    {
+      https.setAuthorization(networkSettings.mqttUsername.c_str(), networkSettings.mqttPassword.c_str());
+      https.addHeader("Content-Type", "application/json");
+      https.setTimeout(5000);
+      int httpCode = https.POST(payload);
+      https.end();
+      return (httpCode == 200 || httpCode == 201);
+    }
+  }
+  return false;
+}
 void sendBackupData()
 {
   if (!SD.exists("/sensor_data.csv"))
     return;
-
-  Serial.println("[Backup] Checking SD card...");
-
   File dataOffline = SD.open("/sensor_data.csv", FILE_READ);
   if (!dataOffline)
   {
@@ -918,52 +767,14 @@ void sendBackupData()
     if (count >= 10)
     {
       payload += "]";
-      bool sendSuccess = false;
 
-      // --- Eksekusi Pengiriman Berdasarkan Mode ---
-      if (networkSettings.networkMode == "Ethernet" && Ethernet.linkStatus() == LinkON)
+      if (sendBackupChunk(payload)) // Eksekusi dengan fungsi helper
       {
-        EthernetClient ethClient;
-        ethClient.setTimeout(5000);
-        String serverPath = "https://api-logger-dev2.medionindonesia.com/api/v1/UpdateLoggingRealtime";
-
-        int result = perform_https_request_mbedtls(
-            ethClient,
-            getDomainFromUrl(serverPath).c_str(),
-            getPathFromUrl(serverPath).c_str(),
-            payload.c_str(),
-            networkSettings.mqttUsername.c_str(),
-            networkSettings.mqttPassword.c_str());
-
-        if (result == 200 || result == 0)
-          sendSuccess = true;
-      }
-      else if (WiFi.status() == WL_CONNECTED)
-      {
-        WiFiClientSecure client;
-        HTTPClient https;
-        client.setInsecure();
-        if (https.begin(client, "https://api-logger-dev2.medionindonesia.com/api/v1/UpdateLoggingRealtime"))
-        {
-          https.setAuthorization(networkSettings.mqttUsername.c_str(), networkSettings.mqttPassword.c_str());
-          https.addHeader("Content-Type", "application/json");
-          https.setTimeout(5000);
-          int httpCode = https.POST(payload);
-          if (httpCode == 200 || httpCode == 201)
-            sendSuccess = true;
-          https.end();
-        }
-      }
-
-      if (sendSuccess)
-      {
-        Serial.printf("[Backup] Chunk Sent (10 items)\n");
         successCount++;
         networkSettings.connStatus = "Connected";
       }
       else
       {
-        Serial.println("[Backup] Chunk Failed!");
         failCount++;
       }
 
@@ -973,21 +784,26 @@ void sendBackupData()
       vTaskDelay(pdMS_TO_TICKS(10));
     }
   }
-
-  // Kirim sisa data (jika ada < 10)
   if (count > 0)
   {
     payload += "]";
-    // (Logika pengiriman sisa data sama dengan di atas, dihapus agar contoh tidak terlalu panjang, tapi di file utuh wajib dimasukkan kembali)
-  }
 
+    if (sendBackupChunk(payload)) // Eksekusi sisa data dengan fungsi helper
+    {
+      successCount++;
+      networkSettings.connStatus = "Connected";
+    }
+    else
+    {
+      failCount++;
+    }
+  }
   dataOffline.close();
   Serial.printf("[Backup] Summary: %d Chunks OK, %d Failed\n", successCount, failCount);
 
   if (failCount == 0 && successCount > 0)
   {
     SD.remove("/sensor_data.csv");
-    Serial.println("[Backup] File cleared.");
   }
 }
 long measureLatency(String url)
