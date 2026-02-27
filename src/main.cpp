@@ -1608,29 +1608,25 @@ void Task_DataLogger(void *parameter)
       lastWatchdogFeed = millis();
     }
 
-    // 1. UPDATE DATA JSON
-    if (xQueueReceive(queueSensorData, &sensorData, 0) == pdTRUE)
+xQueueReceive(queueSensorData, &sensorData, 0);
+if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
+{
+  for (byte i = 1; i < jumlahInputAnalog + 1; i++)
+  {
+    if (analogInput[i].name != "")
     {
-      if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
-      {
-        for (byte i = 1; i < jumlahInputAnalog + 1; i++)
-        {
-          if (analogInput[i].name != "")
-          {
-            jsonSend[analogInput[i].name] = String(sensorData.analogValues[i], 2);
-          }
-        }
-        for (byte i = 1; i < jumlahInputDigital + 1; i++)
-        {
-          if (digitalInput[i].name != "")
-          {
-            jsonSend[digitalInput[i].name] = sensorData.digitalValues[i];
-          }
-        }
-        xSemaphoreGive(jsonMutex);
-      }
+      jsonSend[analogInput[i].name] = analogInput[i].mapValue; 
     }
-
+  }
+  for (byte i = 1; i < jumlahInputDigital + 1; i++)
+  {
+    if (digitalInput[i].name != "")
+    {
+      jsonSend[digitalInput[i].name] = digitalInput[i].value;
+    }
+  }
+  xSemaphoreGive(jsonMutex);
+}
     if (xQueueReceive(queueModbusData, &modbusData, 0) == pdTRUE)
     {
       if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(100)))
@@ -4174,7 +4170,6 @@ void printConfigurationDetails()
     String name = (analogInput[i].name.length() > 0) ? analogInput[i].name : "-";
     String scaleStr = String(analogInput[i].lowLimit) + " - " + String(analogInput[i].highLimit);
     String calStr = "m:" + String(analogInput[i].mValue) + " c:" + String(analogInput[i].cValue);
-
     Serial.printf("A%d | %-19s | %-9s | %-20s | %s\n",
                   i,
                   name.c_str(),
@@ -4184,7 +4179,7 @@ void printConfigurationDetails()
   }
 
   // --------------------------------------------------------------------------
-  // 4. MODBUS CONFIG (Jika ada)
+  // 4. MODBUS CONFIG
   // --------------------------------------------------------------------------
   if (stringParam.length() > 5)
   {
@@ -4192,11 +4187,9 @@ void printConfigurationDetails()
     Serial.printf("Baudrate : %d\n", modbusParam.baudrate);
     Serial.printf("Parity   : %s\n", modbusParam.parity.c_str());
     Serial.printf("Scan Rate: %.1f sec\n", modbusParam.scanRate);
-
     Serial.println("\n[ MODBUS POLLING LIST ]");
     DynamicJsonDocument docTemp(4096);
     DeserializationError error = deserializeJson(docTemp, stringParam);
-
     if (!error)
     {
       JsonArray nameData = docTemp["nameData"];
