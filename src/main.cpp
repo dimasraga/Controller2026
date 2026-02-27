@@ -1318,9 +1318,9 @@ void Task_DataAcquisition(void *parameter)
         int currentRawReading = digitalRead(digitalInput[i].pin);
         if (currentRawReading != lastRawState[i])
         {
-          lastDebounceTime[i] = millis(); // Reset timer
+          lastDebounceTime[i] = millis();
         }
-        lastRawState[i] = currentRawReading; // Simpan status raw terakhir
+        lastRawState[i] = currentRawReading;
 
         int cleanInput = stableState[i];
 
@@ -1336,16 +1336,12 @@ void Task_DataAcquisition(void *parameter)
         static int prevStableState[jumlahInputDigital + 1] = {0};
         bool isRisingEdge = (cleanInput == 1 && prevStableState[i] == 0);
         bool isFallingEdge = (cleanInput == 0 && prevStableState[i] == 1);
-
         prevStableState[i] = cleanInput;
-
-        // Cek Trigger untuk Data Logger
         int pinTrig = 0;
         if (networkSettings.sendTrig.length() >= 3)
           pinTrig = (networkSettings.sendTrig.substring(2, 3)).toInt();
         if (i == pinTrig && isRisingEdge)
           flagSend = true;
-
         if (digitalInput[i].taskMode == "Cycle Time")
         {
           if (digitalInput[i].flagInt)
@@ -1353,6 +1349,7 @@ void Task_DataAcquisition(void *parameter)
             digitalInput[i].value = (digitalInput[i].millisNow - digitalInput[i].millis_1) / 1000.0;
             digitalInput[i].millis_1 = digitalInput[i].millisNow;
             digitalInput[i].flagInt = 0;
+            updateJson("/runtimeData.json", String(i).c_str(), digitalInput[i].value);
           }
         }
         else if (digitalInput[i].taskMode == "Counting")
@@ -1360,6 +1357,7 @@ void Task_DataAcquisition(void *parameter)
           if (isRisingEdge)
           {
             digitalInput[i].value++;
+            updateJson("/runtimeData.json", String(i).c_str(), digitalInput[i].value);
           }
         }
         else if (digitalInput[i].taskMode == "Run Time")
@@ -1380,14 +1378,15 @@ void Task_DataAcquisition(void *parameter)
             digitalInput[i].value = (float)digitalInput[i].sumValue * digitalInput[i].conversionFactor;
             digitalInput[i].sumValue = 0;
             digitalInput[i].lastMillisPulseMode = millis();
+            updateJson("/runtimeData.json", String(i).c_str(), digitalInput[i].value);
           }
         }
         else
         {
           int cleanInput = stableState[i];
           digitalInput[i].value = digitalInput[i].inv ? !cleanInput : cleanInput;
+          updateJson("/runtimeData.json", String(i).c_str(), digitalInput[i].value);
         }
-
         sensorData.digitalValues[i] = digitalInput[i].value;
 
         if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(10)))
@@ -1442,10 +1441,7 @@ void Task_DataAcquisition(void *parameter)
 
       // --- DIGITAL MONITOR ---
       Serial.println("\n=== DIGITAL INPUT MONITOR ===");
-      // Perlebar kolom Name jadi 20 karakter
       Serial.println("ID | Name                 | Value    | Mode         | Status");
-      Serial.println("---|----------------------|----------|--------------|--------");
-
       for (int i = 1; i <= jumlahInputDigital; i++)
       {
         String statusStr;
@@ -1459,13 +1455,9 @@ void Task_DataAcquisition(void *parameter)
           statusStr = String(digitalInput[i].value, 2);
         else
           statusStr = (digitalInput[i].value > 0.5) ? "HIGH" : "LOW";
-
-        // Potong nama jika lebih dari 20 karakter
         String dispName = digitalInput[i].name;
         if (dispName.length() > 20)
           dispName = dispName.substring(0, 20);
-
-        // Ubah %-15s menjadi %-20s
         Serial.printf("D%-2d| %-20s | %-8.2f | %-12s | %s\n", i,
                       dispName.c_str(),
                       digitalInput[i].value,
@@ -1479,7 +1471,7 @@ void Task_DataAcquisition(void *parameter)
 }
 
 // ============================================================================
-// CORE 1 TASK: Modbus Client (Master) - DEBUG VERSION
+// CORE 1 TASK: Modbus Client (Master)
 // ============================================================================
 void Task_ModbusClient(void *parameter)
 {
@@ -1542,7 +1534,7 @@ void Task_ModbusClient(void *parameter)
               addr = paramArray[0];
               fc = paramArray[1];
               reg = paramArray[2];
-              multiplier = paramArray[3];
+              multiplier = paramArray[3].as<float>();
               validParam = true;
             }
           }
@@ -1570,15 +1562,14 @@ void Task_ModbusClient(void *parameter)
                         readSuccess ? "OK" : "TIMEOUT"); // Status Text
 
           // Update ke JSON Send untuk Web/MQTT
-          if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(100)))
+          if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(300)))
           {
             if (currentParamName.length() > 0)
             {
-              // Jika timeout, opsional: jangan update atau update 0
               if (readSuccess)
-                jsonSend[currentParamName] = String(finalValue, 2);
+                jsonSend[currentParamName] = finalValue;
               else if (!jsonSend.containsKey(currentParamName))
-                jsonSend[currentParamName] = String(0.0f, 2); // inisialisasi default
+                jsonSend[currentParamName] = 0.0f;
             }
             xSemaphoreGive(jsonMutex);
           }
@@ -1594,7 +1585,7 @@ void Task_ModbusClient(void *parameter)
 }
 
 // ============================================================================
-// CORE 1 TASK: Data Logger & HTTP Sender (VERSI FINAL - ANTI CRASH)
+// CORE 1 TASK: Data Logger & HTTP Sender
 // ============================================================================
 void Task_DataLogger(void *parameter)
 {
@@ -1649,14 +1640,10 @@ void Task_DataLogger(void *parameter)
       }
     }
 
-    // 2. PERIODIC DATA SENDING
-    // 2. PERIODIC DATA SENDING + SD SAVE (atomik)
     if ((millis() - lastSendTime >= (unsigned long)(networkSettings.sendInterval * 1000)) || flagSend)
     {
       flagSend = false;
       lastSendTime = millis();
-
-      // Siapkan data SD sekali, dipakai untuk send dan save
       String dataToSave = "";
       if (xSemaphoreTake(jsonMutex, pdMS_TO_TICKS(200)))
       {
@@ -1679,8 +1666,6 @@ void Task_DataLogger(void *parameter)
         serializeJson(docSD, dataToSave);
         xSemaphoreGive(jsonMutex);
       }
-
-      // SD Save - setiap kali send
       if (dataToSave.length() > 10)
       {
         if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(500)))
@@ -1738,8 +1723,6 @@ void Task_DataLogger(void *parameter)
 
             sendString = "";
             serializeJson(docNew, sendString);
-
-            // Send data to HTTP queue instead of blocking the task
             HttpSendPacket pkt;
             strlcpy(pkt.data, sendString.c_str(), sizeof(pkt.data));
             strlcpy(pkt.url, networkSettings.endpoint.c_str(), sizeof(pkt.url));
@@ -1920,11 +1903,7 @@ void setup()
   sysMonitor.begin();
   sysMonitor.printCurrent();
   esp_task_wdt_init(60, true);
-  Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  Serial.println("[Init] Configuring Watchdog Timer...");
-  esp_task_wdt_init(60, true); // 30 detik timeout
-  Serial.println("  ✓ Watchdog: 60 seconds");
+  Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   // Set CPU frequency
   setCpuFrequencyMhz(240);
 
@@ -2281,7 +2260,6 @@ void setupWebServer()
               doc = DynamicJsonDocument(4096);
               if (request->hasArg("input"))
               {
-                Serial.println(request->arg("input"));
                 unsigned char id = request->arg("input").toInt();
                 doc["inputType"] = analogInput[id].inputType;
                 doc["filter"] = analogInput[id].filter;
@@ -3562,11 +3540,7 @@ void updateJson(const char *dir, const char *jsonKey, int jsonValue)
 void handleFileRequest(AsyncWebServerRequest *request, const char *filePath, const char *mimeType)
 {
   if (SPIFFS.exists(filePath))
-  {
-    File file = SPIFFS.open(filePath, "r");
     request->send(SPIFFS, filePath, mimeType);
-    file.close();
-  }
   else
   {
     request->send(404, "text/plain", "File Not Found");
@@ -4167,30 +4141,14 @@ void printConfigurationDetails()
   Serial.println();
 
   // 2. DATA LOGGER & PROTOCOL
-  Serial.println("[ DATA LOGGER SETTINGS ]");
-  String logStatus = (networkSettings.loggerMode == "Enabled") ? "ENABLED (ON)" : "DISABLED (OFF)";
-
-  Serial.printf("  %-18s : %s\n", "Logger Mode", logStatus.c_str());
+  Serial.println("[ DATA LOGGER & PROTOCOL ]");
+  Serial.printf("  %-18s : %s\n", "Logger Mode", networkSettings.loggerMode.length() > 0 ? networkSettings.loggerMode.c_str() : "Disabled");
   Serial.printf("  %-18s : %s\n", "Protocol", networkSettings.protocolMode.c_str());
-  Serial.printf("  %-18s : %.1f seconds\n", "Interval", networkSettings.sendInterval);
-
-  if (networkSettings.protocolMode == "HTTP")
-  {
-    Serial.printf("  %-18s : %s\n", "HTTP URL", networkSettings.endpoint.c_str());
-  }
-  else
-  {
-    Serial.printf("  %-18s : %s\n", "MQTT Broker", networkSettings.endpoint.c_str());
+  Serial.printf("  %-18s : %.2f sec\n", "Send Interval", networkSettings.sendInterval);
+  Serial.printf("  %-18s : %s\n", networkSettings.protocolMode == "HTTP" ? "HTTP URL" : "MQTT Broker", networkSettings.endpoint.c_str());
+  if (networkSettings.protocolMode == "MQTT")
     Serial.printf("  %-18s : %s\n", "Pub Topic", networkSettings.pubTopic.c_str());
-  }
-
-  // 2. DATA LOGGER & ERP
-  Serial.println("\n[ DATA LOGGER & ERP ]");
-  String modeLog = (networkSettings.loggerMode.length() > 0) ? networkSettings.loggerMode : "Disabled";
-  Serial.printf("%-20s | %s\n", "Logger Mode", modeLog.c_str());
-  Serial.printf("%-20s | %s\n", "Protocol", networkSettings.protocolMode.c_str());
-  Serial.printf("%-20s | %.2f sec\n", "Send Interval", networkSettings.sendInterval);
-  Serial.printf("%-20s | %s\n", "ERP URL", networkSettings.erpUrl.c_str()); // --------------------------------------------------------------------------
+  Serial.printf("  %-18s : %s\n", "ERP URL", networkSettings.erpUrl.c_str());
   // 2. DIGITAL INPUT CONFIG
   // --------------------------------------------------------------------------
   Serial.println("\n[ DIGITAL INPUT CONFIG ]");
